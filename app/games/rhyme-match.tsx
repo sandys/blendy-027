@@ -7,6 +7,7 @@ import {
   Animated,
   Dimensions,
   Platform,
+  ScrollView,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -49,27 +50,32 @@ export default function RhymeMatchScreen() {
     audioLoopRef.current = true;
     isCorrectAnswerGiven.current = false;
 
+    const playInitialFeedback = async () => {
+      Animated.sequence([
+        Animated.timing(flashAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+        Animated.timing(flashAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+      ]).start();
+      
+      if (Platform.OS !== "web") {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+    };
+
     const playAudioLoop = async () => {
+      await playInitialFeedback();
+      
       while (audioLoopRef.current && !isCorrectAnswerGiven.current) {
         setIsPlayingTarget(true);
-        
-        Animated.sequence([
-          Animated.timing(flashAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: false,
-          }),
-          Animated.timing(flashAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: false,
-          }),
-        ]).start();
-        
-        if (Platform.OS !== "web") {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        }
-        
         await speakText(exerciseData.target.word);
         setIsPlayingTarget(false);
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -93,23 +99,6 @@ export default function RhymeMatchScreen() {
               useNativeDriver: true,
             }),
           ]).start();
-          
-          Animated.sequence([
-            Animated.timing(flashAnim, {
-              toValue: 0.5,
-              duration: 200,
-              useNativeDriver: false,
-            }),
-            Animated.timing(flashAnim, {
-              toValue: 0,
-              duration: 200,
-              useNativeDriver: false,
-            }),
-          ]).start();
-          
-          if (Platform.OS !== "web") {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          }
           
           await speakText(exerciseData.choices[i].word);
           await new Promise(resolve => setTimeout(resolve, 800));
@@ -228,85 +217,89 @@ export default function RhymeMatchScreen() {
         ]} 
         pointerEvents="none"
       />
-      <View style={styles.header}>
-        <Text style={styles.progressText}>
-          Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
-        </Text>
-        <Text style={styles.instructionText}>
-          Which one rhymes with {target.word}?
-        </Text>
-      </View>
-
-      <View style={styles.targetContainer}>
-        <View style={[
-          styles.targetCard,
-          isPlayingTarget && styles.targetCardPlaying
-        ]}>
-          <Text style={styles.targetEmoji}>{target.image}</Text>
-          <Text style={styles.targetWord}>{target.word}</Text>
-          {isPlayingTarget && (
-            <View style={styles.targetAudioIndicator}>
-              <Volume2 size={32} color="#FF6B9D" />
-              <Text style={styles.targetAudioText}>Listening...</Text>
-            </View>
-          )}
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <Text style={styles.progressText}>
+            Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
+          </Text>
+          <Text style={styles.instructionText}>
+            Which one rhymes with {target.word}?
+          </Text>
         </View>
-      </View>
 
-      <View style={styles.choicesContainer}>
-        {choices.map((choice, index) => {
-          const isSelected = selectedChoice === index;
-          const isCorrect = choice.isCorrect;
-          const showCorrect = isSelected && showFeedback && isCorrect;
-          const showIncorrect = isSelected && showFeedback && !isCorrect;
-          const isPlayingAudio = playingAudioIndex === index;
+        <View style={styles.targetContainer}>
+          <View style={[
+            styles.targetCard,
+            isPlayingTarget && styles.targetCardPlaying
+          ]}>
+            <Text style={styles.targetEmoji}>{target.image}</Text>
+            <Text style={styles.targetWord}>{target.word}</Text>
+            {isPlayingTarget && (
+              <View style={styles.targetAudioIndicator}>
+                <Volume2 size={32} color="#FF6B9D" />
+                <Text style={styles.targetAudioText}>Listening...</Text>
+              </View>
+            )}
+          </View>
+        </View>
 
-          return (
-            <Animated.View
-              key={index}
-              style={[
-                styles.choiceWrapper,
-                { transform: [{ scale: scaleAnims[index] }] },
-              ]}
-            >
-              <TouchableOpacity
+        <View style={styles.choicesContainer}>
+          {choices.map((choice, index) => {
+            const isSelected = selectedChoice === index;
+            const isCorrect = choice.isCorrect;
+            const showCorrect = isSelected && showFeedback && isCorrect;
+            const showIncorrect = isSelected && showFeedback && !isCorrect;
+            const isPlayingAudio = playingAudioIndex === index;
+
+            return (
+              <Animated.View
+                key={index}
                 style={[
-                  styles.choiceCard,
-                  showCorrect && styles.choiceCardCorrect,
-                  showIncorrect && styles.choiceCardIncorrect,
-                  isPlayingAudio && styles.choiceCardPlaying,
+                  styles.choiceWrapper,
+                  { transform: [{ scale: scaleAnims[index] }] },
                 ]}
-                onPress={() => handleChoiceTap(index)}
-                disabled={showFeedback}
-                activeOpacity={0.7}
               >
-                <Animated.View style={{ transform: [{ scale: pulseAnims[index] }] }}>
-                  <Text style={styles.choiceEmoji}>{choice.image}</Text>
-                </Animated.View>
-                <Text style={styles.choiceWord}>{choice.word}</Text>
-                {isPlayingAudio && (
-                  <View style={styles.playingIndicator}>
-                    <Volume2 size={24} color="#FF6B9D" />
-                  </View>
-                )}
-                {showCorrect && (
-                  <View style={styles.feedbackOverlay}>
-                    <Text style={styles.feedbackEmoji}>✨</Text>
-                    <Text style={styles.feedbackText}>Great!</Text>
-                  </View>
-                )}
-                {showIncorrect && (
-                  <View style={styles.feedbackOverlay}>
-                    <Text style={styles.feedbackEmoji}>🤔</Text>
-                    <Text style={styles.feedbackText}>Try again!</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </Animated.View>
-          );
-        })}
-      </View>
-
+                <TouchableOpacity
+                  style={[
+                    styles.choiceCard,
+                    showCorrect && styles.choiceCardCorrect,
+                    showIncorrect && styles.choiceCardIncorrect,
+                    isPlayingAudio && styles.choiceCardPlaying,
+                  ]}
+                  onPress={() => handleChoiceTap(index)}
+                  disabled={showFeedback}
+                  activeOpacity={0.7}
+                >
+                  <Animated.View style={{ transform: [{ scale: pulseAnims[index] }] }}>
+                    <Text style={styles.choiceEmoji}>{choice.image}</Text>
+                  </Animated.View>
+                  <Text style={styles.choiceWord}>{choice.word}</Text>
+                  {isPlayingAudio && (
+                    <View style={styles.playingIndicator}>
+                      <Volume2 size={24} color="#FF6B9D" />
+                    </View>
+                  )}
+                  {showCorrect && (
+                    <View style={styles.feedbackOverlay}>
+                      <Text style={styles.feedbackEmoji}>✨</Text>
+                      <Text style={styles.feedbackText}>Great!</Text>
+                    </View>
+                  )}
+                  {showIncorrect && (
+                    <View style={styles.feedbackOverlay}>
+                      <Text style={styles.feedbackEmoji}>🤔</Text>
+                      <Text style={styles.feedbackText}>Try again!</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+            );
+          })}
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -315,7 +308,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFF5F7",
+  },
+  scrollContent: {
     padding: 20,
+    paddingBottom: 40,
   },
   header: {
     marginTop: 20,
@@ -364,18 +360,21 @@ const styles = StyleSheet.create({
   },
   choicesContainer: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "center",
     flexWrap: "wrap",
     gap: 15,
+    marginTop: 20,
   },
   choiceWrapper: {
-    width: (width - 60) / 3,
+    width: Math.min((width - 70) / 3, 140),
+    marginBottom: 10,
   },
   choiceCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 20,
+    padding: 15,
     alignItems: "center",
+    justifyContent: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -383,6 +382,7 @@ const styles = StyleSheet.create({
     elevation: 3,
     borderWidth: 3,
     borderColor: "transparent",
+    minHeight: 140,
   },
   choiceCardCorrect: {
     borderColor: "#4CAF50",
@@ -393,25 +393,25 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFEBEE",
   },
   choiceEmoji: {
-    fontSize: 60,
+    fontSize: 50,
     marginBottom: 8,
   },
   choiceWord: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: "600" as const,
     color: "#333",
+    textAlign: "center",
   },
   feedbackOverlay: {
     position: "absolute",
-    top: -10,
+    top: 0,
     left: 0,
     right: 0,
+    bottom: 0,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.92)",
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
     borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
   },
   feedbackEmoji: {
     fontSize: 48,
