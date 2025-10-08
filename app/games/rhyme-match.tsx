@@ -26,11 +26,13 @@ export default function RhymeMatchScreen() {
   const [selectedChoice, setSelectedChoice] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState<boolean>(false);
   const [playingAudioIndex, setPlayingAudioIndex] = useState<number | null>(null);
-  const [hasPlayedIntro, setHasPlayedIntro] = useState<boolean>(false);
+  const [isPlayingTarget, setIsPlayingTarget] = useState<boolean>(false);
   const [scaleAnims] = useState(
     [0, 1, 2].map(() => new Animated.Value(1))
   );
   const pulseAnims = useRef([0, 1, 2].map(() => new Animated.Value(1))).current;
+  const audioLoopRef = useRef<boolean>(true);
+  const isCorrectAnswerGiven = useRef<boolean>(false);
 
   const lesson = SAMPLE_LESSONS.find((l) => l.lesson_number === lessonNumber);
   const exercise = lesson?.exercises[exerciseIndex];
@@ -43,37 +45,50 @@ export default function RhymeMatchScreen() {
   useEffect(() => {
     if (!exerciseData) return;
 
-    const playIntroSequence = async () => {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await speakText(exerciseData.target.word);
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      for (let i = 0; i < exerciseData.choices.length; i++) {
-        setPlayingAudioIndex(i);
+    audioLoopRef.current = true;
+    isCorrectAnswerGiven.current = false;
+
+    const playAudioLoop = async () => {
+      while (audioLoopRef.current && !isCorrectAnswerGiven.current) {
+        setIsPlayingTarget(true);
+        await speakText(exerciseData.target.word);
+        setIsPlayingTarget(false);
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        Animated.sequence([
-          Animated.timing(pulseAnims[i], {
-            toValue: 1.15,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnims[i], {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-        ]).start();
+        if (!audioLoopRef.current || isCorrectAnswerGiven.current) break;
         
-        await speakText(exerciseData.choices[i].word);
-        await new Promise(resolve => setTimeout(resolve, 600));
+        for (let i = 0; i < exerciseData.choices.length; i++) {
+          if (!audioLoopRef.current || isCorrectAnswerGiven.current) break;
+          
+          setPlayingAudioIndex(i);
+          
+          Animated.sequence([
+            Animated.timing(pulseAnims[i], {
+              toValue: 1.15,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseAnims[i], {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+          ]).start();
+          
+          await speakText(exerciseData.choices[i].word);
+          await new Promise(resolve => setTimeout(resolve, 800));
+        }
+        
+        setPlayingAudioIndex(null);
+        await new Promise(resolve => setTimeout(resolve, 1500));
       }
-      
-      setPlayingAudioIndex(null);
-      setHasPlayedIntro(true);
     };
 
-    setHasPlayedIntro(false);
-    playIntroSequence();
+    playAudioLoop();
+
+    return () => {
+      audioLoopRef.current = false;
+    };
   }, [exerciseIndex, exerciseData, pulseAnims]);
 
   if (!exerciseData) {
@@ -95,6 +110,11 @@ export default function RhymeMatchScreen() {
     const isCorrect = choices[index].isCorrect;
 
     if (isCorrect) {
+      isCorrectAnswerGiven.current = true;
+      audioLoopRef.current = false;
+      setPlayingAudioIndex(null);
+      setIsPlayingTarget(false);
+
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -169,20 +189,21 @@ export default function RhymeMatchScreen() {
         </Text>
       </View>
 
-      <TouchableOpacity 
-        style={styles.targetContainer}
-        onPress={() => speakText(target.word)}
-        activeOpacity={0.8}
-      >
-        <View style={styles.targetCard}>
+      <View style={styles.targetContainer}>
+        <View style={[
+          styles.targetCard,
+          isPlayingTarget && styles.targetCardPlaying
+        ]}>
           <Text style={styles.targetEmoji}>{target.image}</Text>
           <Text style={styles.targetWord}>{target.word}</Text>
-          <View style={styles.audioIndicator}>
-            <Volume2 size={28} color="#FF6B9D" />
-            <Text style={styles.audioHint}>Tap to hear</Text>
-          </View>
+          {isPlayingTarget && (
+            <View style={styles.targetAudioIndicator}>
+              <Volume2 size={32} color="#FF6B9D" />
+              <Text style={styles.targetAudioText}>Listening...</Text>
+            </View>
+          )}
         </View>
-      </TouchableOpacity>
+      </View>
 
       <View style={styles.choicesContainer}>
         {choices.map((choice, index) => {
@@ -208,7 +229,7 @@ export default function RhymeMatchScreen() {
                   isPlayingAudio && styles.choiceCardPlaying,
                 ]}
                 onPress={() => handleChoiceTap(index)}
-                disabled={showFeedback || !hasPlayedIntro}
+                disabled={showFeedback}
                 activeOpacity={0.7}
               >
                 <Animated.View style={{ transform: [{ scale: pulseAnims[index] }] }}>
@@ -238,11 +259,9 @@ export default function RhymeMatchScreen() {
         })}
       </View>
 
-      {!hasPlayedIntro && (
-        <View style={styles.loadingOverlay}>
-          <Text style={styles.loadingText}>🎵 Listen carefully...</Text>
-        </View>
-      )}
+      <View style={styles.instructionOverlay}>
+        <Text style={styles.instructionOverlayText}>🎵 Listen and tap the rhyming word!</Text>
+      </View>
 
     </View>
   );
@@ -378,6 +397,48 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600" as const,
     color: "#FF6B9D",
+  },
+  targetCardPlaying: {
+    borderColor: "#FF6B9D",
+    borderWidth: 5,
+    backgroundColor: "#FFF5F7",
+    shadowColor: "#FF6B9D",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  targetAudioIndicator: {
+    marginTop: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 24,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 2,
+    borderColor: "#FF6B9D",
+  },
+  targetAudioText: {
+    fontSize: 18,
+    fontWeight: "700" as const,
+    color: "#FF6B9D",
+  },
+  instructionOverlay: {
+    position: "absolute",
+    bottom: 40,
+    left: 20,
+    right: 20,
+    backgroundColor: "rgba(255, 107, 157, 0.95)",
+    borderRadius: 20,
+    padding: 20,
+    alignItems: "center",
+  },
+  instructionOverlayText: {
+    fontSize: 18,
+    fontWeight: "700" as const,
+    color: "#FFFFFF",
   },
   playingIndicator: {
     position: "absolute",
