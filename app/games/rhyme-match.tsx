@@ -118,11 +118,11 @@ export default function RhymeMatchScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.header}>
-        <Text style={styles.instructionText}>
-          Which one rhymes with {target.word}?
-        </Text>
         <Text style={styles.progressText}>
           Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
+        </Text>
+        <Text style={styles.instructionText}>
+          Which one rhymes with {target.word}?
         </Text>
       </View>
 
@@ -201,9 +201,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   progressText: {
-    fontSize: 16,
+    fontSize: 14,
     color: "#999",
     fontWeight: "600" as const,
+    marginBottom: 12,
   },
   targetContainer: {
     alignItems: "center",
@@ -271,22 +272,23 @@ const styles = StyleSheet.create({
   },
   feedbackOverlay: {
     position: "absolute",
-    top: 0,
+    top: -10,
     left: 0,
     right: 0,
-    bottom: 0,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    backgroundColor: "rgba(255, 255, 255, 0.92)",
     borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
   },
   feedbackEmoji: {
-    fontSize: 60,
-    marginBottom: 8,
+    fontSize: 48,
+    marginBottom: 4,
   },
   feedbackText: {
-    fontSize: 28,
-    fontWeight: "700" as const,
+    fontSize: 22,
+    fontWeight: "800" as const,
     color: "#333",
   },
   errorText: {

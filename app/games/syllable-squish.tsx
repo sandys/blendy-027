@@ -127,11 +127,11 @@ export default function SyllableSquishScreen() {
       ]}
     >
       <View style={styles.header}>
-        <Text style={styles.instructionText}>
-          Tap the button for each syllable
-        </Text>
         <Text style={styles.progressText}>
           Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
+        </Text>
+        <Text style={styles.instructionText}>
+          Tap the button for each syllable
         </Text>
       </View>
 
@@ -237,9 +237,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   progressText: {
-    fontSize: 16,
+    fontSize: 14,
     color: "#999",
     fontWeight: "600" as const,
+    marginBottom: 12,
   },
   wordContainer: {
     alignItems: "center",
