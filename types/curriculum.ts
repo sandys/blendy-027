@@ -28,6 +28,7 @@ export type ResponseType =
   | "read_aloud"
   | "voice_recognition"
   | "tap_count"
+  | "tap_choice"
   | "multiple_choice";
 
 export interface SRSData {
@@ -64,15 +65,16 @@ export interface SyllableSquishData {
 export interface SoundSlideData {
   onset: string;
   rime: string;
-  fullWord: string;
+  word: string;
+  image?: string;
 }
 
 export interface SoundDetectiveData {
   word: string;
   image: string;
-  position: "first" | "last" | "medial";
+  targetPosition: "first" | "last" | "middle";
   correctSound: string;
-  distractors: string[];
+  choices: string[];
 }
 
 export interface WordBuilderData {
