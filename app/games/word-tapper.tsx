@@ -11,7 +11,9 @@ import {
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
+import { Volume2 } from "lucide-react-native";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
+import { speakText } from "@/utils/audio";
 
 const { width } = Dimensions.get("window");
 
@@ -126,6 +128,13 @@ export default function WordTapperScreen() {
       <View style={styles.sentenceContainer}>
         <View style={styles.sentenceCard}>
           <Text style={styles.sentenceText}>{sentence}</Text>
+          <TouchableOpacity
+            style={styles.audioButton}
+            onPress={() => speakText(sentence, { rate: 0.7 })}
+            activeOpacity={0.7}
+          >
+            <Volume2 size={28} color="#4ECDC4" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -315,5 +324,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#F44336",
     textAlign: "center",
+  },
+  audioButton: {
+    marginTop: 20,
+    padding: 12,
+    borderRadius: 24,
+    backgroundColor: "#E8F9F8",
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
   },
 });

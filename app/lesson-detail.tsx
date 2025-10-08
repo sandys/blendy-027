@@ -8,8 +8,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { Play } from "lucide-react-native";
+import { Play, Volume2 } from "lucide-react-native";
 import { useApp } from "@/contexts/AppContext";
+import { speakText } from "@/utils/audio";
 
 const EXERCISE_TYPE_TO_ROUTE: Record<string, string> = {
   "Rhyme Match": "/games/rhyme-match",
@@ -73,9 +74,15 @@ export default function LessonDetailScreen() {
               <Text style={styles.sectionTitle}>New Letter Sounds</Text>
               <View style={styles.graphemesContainer}>
                 {lesson.new_graphemes.map((grapheme, index) => (
-                  <View key={index} style={styles.graphemeChip}>
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.graphemeChip}
+                    onPress={() => speakText(grapheme, { rate: 0.6 })}
+                    activeOpacity={0.7}
+                  >
                     <Text style={styles.graphemeText}>{grapheme}</Text>
-                  </View>
+                    <Volume2 size={16} color="#FFFFFF" style={styles.graphemeIcon} />
+                  </TouchableOpacity>
                 ))}
               </View>
             </View>
@@ -87,9 +94,15 @@ export default function LessonDetailScreen() {
                 <Text style={styles.sectionTitle}>New Sight Words</Text>
                 <View style={styles.wordsContainer}>
                   {lesson.new_irregular_words.map((word, index) => (
-                    <View key={index} style={styles.wordChip}>
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.wordChip}
+                      onPress={() => speakText(word, { rate: 0.7 })}
+                      activeOpacity={0.7}
+                    >
                       <Text style={styles.wordText}>{word}</Text>
-                    </View>
+                      <Volume2 size={14} color="#FFFFFF" style={styles.wordIcon} />
+                    </TouchableOpacity>
                   ))}
                 </View>
               </View>
@@ -125,6 +138,14 @@ export default function LessonDetailScreen() {
               <View style={styles.storyCard}>
                 <Text style={styles.storyTitle}>{lesson.story.title}</Text>
                 <Text style={styles.storyText}>{lesson.story.text}</Text>
+                <TouchableOpacity
+                  style={styles.storyAudioButton}
+                  onPress={() => speakText(lesson.story!.text, { rate: 0.75 })}
+                  activeOpacity={0.7}
+                >
+                  <Volume2 size={24} color="#4ECDC4" />
+                  <Text style={styles.storyAudioText}>Read Story</Text>
+                </TouchableOpacity>
               </View>
             </View>
           )}
@@ -178,11 +199,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   graphemeText: {
     fontSize: 24,
     fontWeight: "700" as const,
     color: "#FFFFFF",
+  },
+  graphemeIcon: {
+    marginLeft: 4,
   },
   wordsContainer: {
     flexDirection: "row",
@@ -194,11 +221,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   wordText: {
     fontSize: 18,
     fontWeight: "600" as const,
     color: "#FFFFFF",
+  },
+  wordIcon: {
+    marginLeft: 2,
   },
   exerciseCard: {
     backgroundColor: "#FFFFFF",
@@ -261,5 +294,20 @@ const styles = StyleSheet.create({
     color: "#F44336",
     textAlign: "center",
     marginTop: 40,
+  },
+  storyAudioButton: {
+    marginTop: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    padding: 12,
+    borderRadius: 20,
+    backgroundColor: "#E8F9F8",
+  },
+  storyAudioText: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: "#4ECDC4",
   },
 });

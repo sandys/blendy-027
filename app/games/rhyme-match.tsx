@@ -11,7 +11,9 @@ import {
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
+import { Volume2 } from "lucide-react-native";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
+import { speakText } from "@/utils/audio";
 
 const { width } = Dimensions.get("window");
 
@@ -130,6 +132,13 @@ export default function RhymeMatchScreen() {
         <View style={styles.targetCard}>
           <Text style={styles.targetEmoji}>{target.image}</Text>
           <Text style={styles.targetWord}>{target.word}</Text>
+          <TouchableOpacity
+            style={styles.audioButton}
+            onPress={() => speakText(target.word)}
+            activeOpacity={0.7}
+          >
+            <Volume2 size={24} color="#FF6B9D" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -160,6 +169,16 @@ export default function RhymeMatchScreen() {
               >
                 <Text style={styles.choiceEmoji}>{choice.image}</Text>
                 <Text style={styles.choiceWord}>{choice.word}</Text>
+                <TouchableOpacity
+                  style={styles.choiceAudioButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    speakText(choice.word);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Volume2 size={16} color="#666" />
+                </TouchableOpacity>
                 {showCorrect && (
                   <View style={styles.feedbackOverlay}>
                     <Text style={styles.feedbackEmoji}>✨</Text>
@@ -295,5 +314,21 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#F44336",
     textAlign: "center",
+  },
+  audioButton: {
+    marginTop: 12,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: "#FFF5F7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  choiceAudioButton: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    padding: 4,
+    borderRadius: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
   },
 });
