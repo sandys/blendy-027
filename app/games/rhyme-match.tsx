@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -23,16 +23,60 @@ export default function RhymeMatchScreen() {
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
 
-  const lesson = SAMPLE_LESSONS.find((l) => l.lesson_number === lessonNumber);
-  const exercise = lesson?.exercises[exerciseIndex];
-
   const [selectedChoice, setSelectedChoice] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState<boolean>(false);
+  const [playingAudioIndex, setPlayingAudioIndex] = useState<number | null>(null);
+  const [hasPlayedIntro, setHasPlayedIntro] = useState<boolean>(false);
   const [scaleAnims] = useState(
     [0, 1, 2].map(() => new Animated.Value(1))
   );
+  const pulseAnims = useRef([0, 1, 2].map(() => new Animated.Value(1))).current;
 
-  if (!exercise || exercise.exercise_type !== "Rhyme Match") {
+  const lesson = SAMPLE_LESSONS.find((l) => l.lesson_number === lessonNumber);
+  const exercise = lesson?.exercises[exerciseIndex];
+
+  const exerciseData = exercise?.exercise_type === "Rhyme Match" ? exercise.data as {
+    target: { word: string; image: string };
+    choices: { word: string; image: string; isCorrect: boolean }[];
+  } : null;
+
+  useEffect(() => {
+    if (!exerciseData) return;
+
+    const playIntroSequence = async () => {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await speakText(exerciseData.target.word);
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      for (let i = 0; i < exerciseData.choices.length; i++) {
+        setPlayingAudioIndex(i);
+        
+        Animated.sequence([
+          Animated.timing(pulseAnims[i], {
+            toValue: 1.15,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnims[i], {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+        
+        await speakText(exerciseData.choices[i].word);
+        await new Promise(resolve => setTimeout(resolve, 600));
+      }
+      
+      setPlayingAudioIndex(null);
+      setHasPlayedIntro(true);
+    };
+
+    setHasPlayedIntro(false);
+    playIntroSequence();
+  }, [exerciseIndex, exerciseData, pulseAnims]);
+
+  if (!exerciseData) {
     return (
       <View style={styles.container}>
         <Text style={styles.errorText}>Exercise not found</Text>
@@ -40,10 +84,7 @@ export default function RhymeMatchScreen() {
     );
   }
 
-  const { target, choices } = exercise.data as {
-    target: { word: string; image: string };
-    choices: { word: string; image: string; isCorrect: boolean }[];
-  };
+  const { target, choices } = exerciseData;
 
   const handleChoiceTap = (index: number) => {
     if (showFeedback) return;
@@ -128,19 +169,20 @@ export default function RhymeMatchScreen() {
         </Text>
       </View>
 
-      <View style={styles.targetContainer}>
+      <TouchableOpacity 
+        style={styles.targetContainer}
+        onPress={() => speakText(target.word)}
+        activeOpacity={0.8}
+      >
         <View style={styles.targetCard}>
           <Text style={styles.targetEmoji}>{target.image}</Text>
           <Text style={styles.targetWord}>{target.word}</Text>
-          <TouchableOpacity
-            style={styles.audioButton}
-            onPress={() => speakText(target.word)}
-            activeOpacity={0.7}
-          >
-            <Volume2 size={24} color="#FF6B9D" />
-          </TouchableOpacity>
+          <View style={styles.audioIndicator}>
+            <Volume2 size={28} color="#FF6B9D" />
+            <Text style={styles.audioHint}>Tap to hear</Text>
+          </View>
         </View>
-      </View>
+      </TouchableOpacity>
 
       <View style={styles.choicesContainer}>
         {choices.map((choice, index) => {
@@ -148,6 +190,7 @@ export default function RhymeMatchScreen() {
           const isCorrect = choice.isCorrect;
           const showCorrect = isSelected && showFeedback && isCorrect;
           const showIncorrect = isSelected && showFeedback && !isCorrect;
+          const isPlayingAudio = playingAudioIndex === index;
 
           return (
             <Animated.View
@@ -162,23 +205,21 @@ export default function RhymeMatchScreen() {
                   styles.choiceCard,
                   showCorrect && styles.choiceCardCorrect,
                   showIncorrect && styles.choiceCardIncorrect,
+                  isPlayingAudio && styles.choiceCardPlaying,
                 ]}
                 onPress={() => handleChoiceTap(index)}
-                disabled={showFeedback}
+                disabled={showFeedback || !hasPlayedIntro}
                 activeOpacity={0.7}
               >
-                <Text style={styles.choiceEmoji}>{choice.image}</Text>
+                <Animated.View style={{ transform: [{ scale: pulseAnims[index] }] }}>
+                  <Text style={styles.choiceEmoji}>{choice.image}</Text>
+                </Animated.View>
                 <Text style={styles.choiceWord}>{choice.word}</Text>
-                <TouchableOpacity
-                  style={styles.choiceAudioButton}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    speakText(choice.word);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Volume2 size={16} color="#666" />
-                </TouchableOpacity>
+                {isPlayingAudio && (
+                  <View style={styles.playingIndicator}>
+                    <Volume2 size={24} color="#FF6B9D" />
+                  </View>
+                )}
                 {showCorrect && (
                   <View style={styles.feedbackOverlay}>
                     <Text style={styles.feedbackEmoji}>✨</Text>
@@ -196,6 +237,12 @@ export default function RhymeMatchScreen() {
           );
         })}
       </View>
+
+      {!hasPlayedIntro && (
+        <View style={styles.loadingOverlay}>
+          <Text style={styles.loadingText}>🎵 Listen carefully...</Text>
+        </View>
+      )}
 
     </View>
   );
@@ -231,15 +278,17 @@ const styles = StyleSheet.create({
   },
   targetCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 30,
+    borderRadius: 24,
+    padding: 40,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
-    minWidth: width * 0.5,
+    minWidth: width * 0.6,
+    borderWidth: 3,
+    borderColor: "#FF6B9D",
   },
   targetEmoji: {
     fontSize: 80,
@@ -315,20 +364,47 @@ const styles = StyleSheet.create({
     color: "#F44336",
     textAlign: "center",
   },
-  audioButton: {
-    marginTop: 12,
-    padding: 8,
+  audioIndicator: {
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 20,
     backgroundColor: "#FFF5F7",
-    alignItems: "center",
-    justifyContent: "center",
   },
-  choiceAudioButton: {
+  audioHint: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: "#FF6B9D",
+  },
+  playingIndicator: {
     position: "absolute",
-    top: 8,
-    right: 8,
-    padding: 4,
-    borderRadius: 12,
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    top: 12,
+    right: 12,
+    backgroundColor: "#FFF5F7",
+    borderRadius: 20,
+    padding: 8,
+  },
+  choiceCardPlaying: {
+    borderColor: "#FF6B9D",
+    borderWidth: 4,
+    backgroundColor: "#FFF5F7",
+  },
+  loadingOverlay: {
+    position: "absolute",
+    bottom: 40,
+    left: 20,
+    right: 20,
+    backgroundColor: "rgba(255, 107, 157, 0.95)",
+    borderRadius: 20,
+    padding: 20,
+    alignItems: "center",
+  },
+  loadingText: {
+    fontSize: 20,
+    fontWeight: "700" as const,
+    color: "#FFFFFF",
   },
 });
