@@ -33,6 +33,7 @@ export default function RhymeMatchScreen() {
   const pulseAnims = useRef([0, 1, 2].map(() => new Animated.Value(1))).current;
   const audioLoopRef = useRef<boolean>(true);
   const isCorrectAnswerGiven = useRef<boolean>(false);
+  const flashAnim = useRef(new Animated.Value(0)).current;
 
   const lesson = SAMPLE_LESSONS.find((l) => l.lesson_number === lessonNumber);
   const exercise = lesson?.exercises[exerciseIndex];
@@ -51,6 +52,24 @@ export default function RhymeMatchScreen() {
     const playAudioLoop = async () => {
       while (audioLoopRef.current && !isCorrectAnswerGiven.current) {
         setIsPlayingTarget(true);
+        
+        Animated.sequence([
+          Animated.timing(flashAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: false,
+          }),
+          Animated.timing(flashAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: false,
+          }),
+        ]).start();
+        
+        if (Platform.OS !== "web") {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        }
+        
         await speakText(exerciseData.target.word);
         setIsPlayingTarget(false);
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -75,6 +94,23 @@ export default function RhymeMatchScreen() {
             }),
           ]).start();
           
+          Animated.sequence([
+            Animated.timing(flashAnim, {
+              toValue: 0.5,
+              duration: 200,
+              useNativeDriver: false,
+            }),
+            Animated.timing(flashAnim, {
+              toValue: 0,
+              duration: 200,
+              useNativeDriver: false,
+            }),
+          ]).start();
+          
+          if (Platform.OS !== "web") {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }
+          
           await speakText(exerciseData.choices[i].word);
           await new Promise(resolve => setTimeout(resolve, 800));
         }
@@ -89,7 +125,7 @@ export default function RhymeMatchScreen() {
     return () => {
       audioLoopRef.current = false;
     };
-  }, [exerciseIndex, exerciseData, pulseAnims]);
+  }, [exerciseIndex, exerciseData, pulseAnims, flashAnim]);
 
   if (!exerciseData) {
     return (
@@ -178,8 +214,20 @@ export default function RhymeMatchScreen() {
     }
   };
 
+  const flashColor = flashAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(255, 107, 157, 0)', 'rgba(255, 107, 157, 0.3)'],
+  });
+
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <Animated.View 
+        style={[
+          styles.flashOverlay,
+          { backgroundColor: flashColor }
+        ]} 
+        pointerEvents="none"
+      />
       <View style={styles.header}>
         <Text style={styles.progressText}>
           Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
@@ -257,10 +305,6 @@ export default function RhymeMatchScreen() {
             </Animated.View>
           );
         })}
-      </View>
-
-      <View style={styles.instructionOverlay}>
-        <Text style={styles.instructionOverlayText}>🎵 Listen and tap the rhyming word!</Text>
       </View>
 
     </View>
@@ -467,5 +511,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700" as const,
     color: "#FFFFFF",
+  },
+  flashOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
   },
 });
