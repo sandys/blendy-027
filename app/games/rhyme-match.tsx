@@ -7,7 +7,6 @@ import {
   Animated,
   Dimensions,
   Platform,
-  ScrollView,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,7 +15,7 @@ import { Volume2 } from "lucide-react-native";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
 
-const { width } = Dimensions.get("window");
+const { height } = Dimensions.get("window");
 
 export default function RhymeMatchScreen() {
   const insets = useSafeAreaInsets();
@@ -209,7 +208,7 @@ export default function RhymeMatchScreen() {
   });
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>
       <Animated.View 
         style={[
           styles.flashOverlay,
@@ -217,89 +216,89 @@ export default function RhymeMatchScreen() {
         ]} 
         pointerEvents="none"
       />
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <Text style={styles.progressText}>
-            Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
-          </Text>
-          <Text style={styles.instructionText}>
-            Which one rhymes with {target.word}?
-          </Text>
-        </View>
+      <View style={styles.landscapeContent}>
+        <View style={styles.leftSection}>
+          <View style={styles.header}>
+            <Text style={styles.progressText}>
+              Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
+            </Text>
+            <Text style={styles.instructionText}>
+              Which one rhymes with?
+            </Text>
+          </View>
 
-        <View style={styles.targetContainer}>
-          <View style={[
-            styles.targetCard,
-            isPlayingTarget && styles.targetCardPlaying
-          ]}>
-            <Text style={styles.targetEmoji}>{target.image}</Text>
-            <Text style={styles.targetWord}>{target.word}</Text>
-            {isPlayingTarget && (
-              <View style={styles.targetAudioIndicator}>
-                <Volume2 size={32} color="#FF6B9D" />
-                <Text style={styles.targetAudioText}>Listening...</Text>
-              </View>
-            )}
+          <View style={styles.targetContainer}>
+            <View style={[
+              styles.targetCard,
+              isPlayingTarget && styles.targetCardPlaying
+            ]}>
+              <Text style={styles.targetEmoji}>{target.image}</Text>
+              <Text style={styles.targetWord}>{target.word}</Text>
+              {isPlayingTarget && (
+                <View style={styles.targetAudioIndicator}>
+                  <Volume2 size={28} color="#FF6B9D" />
+                </View>
+              )}
+            </View>
           </View>
         </View>
 
-        <View style={styles.choicesContainer}>
-          {choices.map((choice, index) => {
-            const isSelected = selectedChoice === index;
-            const isCorrect = choice.isCorrect;
-            const showCorrect = isSelected && showFeedback && isCorrect;
-            const showIncorrect = isSelected && showFeedback && !isCorrect;
-            const isPlayingAudio = playingAudioIndex === index;
+        <View style={styles.rightSection}>
+          <View style={styles.choicesContainer}>
+            {choices.map((choice, index) => {
+              const isSelected = selectedChoice === index;
+              const isCorrect = choice.isCorrect;
+              const showCorrect = isSelected && showFeedback && isCorrect;
+              const showIncorrect = isSelected && showFeedback && !isCorrect;
+              const isPlayingAudio = playingAudioIndex === index;
 
-            return (
-              <Animated.View
-                key={index}
-                style={[
-                  styles.choiceWrapper,
-                  { transform: [{ scale: scaleAnims[index] }] },
-                ]}
-              >
-                <TouchableOpacity
+              return (
+                <Animated.View
+                  key={index}
                   style={[
-                    styles.choiceCard,
-                    showCorrect && styles.choiceCardCorrect,
-                    showIncorrect && styles.choiceCardIncorrect,
-                    isPlayingAudio && styles.choiceCardPlaying,
+                    styles.choiceWrapper,
+                    { transform: [{ scale: scaleAnims[index] }] },
                   ]}
-                  onPress={() => handleChoiceTap(index)}
-                  disabled={showFeedback}
-                  activeOpacity={0.7}
                 >
-                  <Animated.View style={{ transform: [{ scale: pulseAnims[index] }] }}>
-                    <Text style={styles.choiceEmoji}>{choice.image}</Text>
-                  </Animated.View>
-                  <Text style={styles.choiceWord}>{choice.word}</Text>
-                  {isPlayingAudio && (
-                    <View style={styles.playingIndicator}>
-                      <Volume2 size={24} color="#FF6B9D" />
-                    </View>
-                  )}
-                  {showCorrect && (
-                    <View style={styles.feedbackOverlay}>
-                      <Text style={styles.feedbackEmoji}>✨</Text>
-                      <Text style={styles.feedbackText}>Great!</Text>
-                    </View>
-                  )}
-                  {showIncorrect && (
-                    <View style={styles.feedbackOverlay}>
-                      <Text style={styles.feedbackEmoji}>🤔</Text>
-                      <Text style={styles.feedbackText}>Try again!</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </Animated.View>
-            );
-          })}
+                  <TouchableOpacity
+                    style={[
+                      styles.choiceCard,
+                      showCorrect && styles.choiceCardCorrect,
+                      showIncorrect && styles.choiceCardIncorrect,
+                      isPlayingAudio && styles.choiceCardPlaying,
+                    ]}
+                    onPress={() => handleChoiceTap(index)}
+                    disabled={showFeedback}
+                    activeOpacity={0.7}
+                  >
+                    <Animated.View style={{ transform: [{ scale: pulseAnims[index] }] }}>
+                      <Text style={styles.choiceEmoji}>{choice.image}</Text>
+                    </Animated.View>
+                    <Text style={styles.choiceWord}>{choice.word}</Text>
+                    {isPlayingAudio && (
+                      <View style={styles.playingIndicator}>
+                        <Volume2 size={20} color="#FF6B9D" />
+                      </View>
+                    )}
+                    {showCorrect && (
+                      <View style={styles.feedbackOverlay}>
+                        <Text style={styles.feedbackEmoji}>✨</Text>
+                        <Text style={styles.feedbackText}>Great!</Text>
+                      </View>
+                    )}
+                    {showIncorrect && (
+                      <View style={styles.feedbackOverlay}>
+                        <Text style={styles.feedbackEmoji}>🤔</Text>
+                        <Text style={styles.feedbackText}>Try again!</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            })}
+          </View>
         </View>
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -309,70 +308,88 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FFF5F7",
   },
+  landscapeContent: {
+    flex: 1,
+    flexDirection: "row",
+    padding: 20,
+  },
+  leftSection: {
+    flex: 0.4,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingRight: 20,
+  },
+  rightSection: {
+    flex: 0.6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   scrollContent: {
     padding: 20,
     paddingBottom: 40,
   },
   header: {
-    marginTop: 20,
     marginBottom: 30,
     alignItems: "center",
   },
   instructionText: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "700" as const,
     color: "#FF6B9D",
     textAlign: "center",
     marginBottom: 8,
   },
   progressText: {
-    fontSize: 14,
+    fontSize: 16,
     color: "#999",
     fontWeight: "600" as const,
     marginBottom: 12,
   },
   targetContainer: {
     alignItems: "center",
-    marginBottom: 50,
+    justifyContent: "center",
+    flex: 1,
   },
   targetCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 24,
-    padding: 40,
+    padding: 30,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
-    minWidth: width * 0.6,
-    borderWidth: 3,
+    minWidth: 200,
+    borderWidth: 4,
     borderColor: "#FF6B9D",
   },
   targetEmoji: {
-    fontSize: 80,
+    fontSize: 100,
     marginBottom: 10,
   },
   targetWord: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: "700" as const,
     color: "#333",
   },
   choicesContainer: {
     flexDirection: "row",
     justifyContent: "center",
+    alignItems: "center",
     flexWrap: "wrap",
-    gap: 15,
-    marginTop: 20,
+    gap: 20,
+    maxWidth: "100%",
   },
   choiceWrapper: {
-    width: Math.min((width - 70) / 3, 140),
-    marginBottom: 10,
+    width: Math.min((height - 100) / 3, 180),
+    height: Math.min((height - 100) / 3, 180),
   },
   choiceCard: {
+    flex: 1,
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 15,
+    borderRadius: 20,
+    padding: 20,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -380,9 +397,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 3,
-    borderWidth: 3,
+    borderWidth: 4,
     borderColor: "transparent",
-    minHeight: 140,
   },
   choiceCardCorrect: {
     borderColor: "#4CAF50",
@@ -393,11 +409,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFEBEE",
   },
   choiceEmoji: {
-    fontSize: 50,
+    fontSize: 60,
     marginBottom: 8,
   },
   choiceWord: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "600" as const,
     color: "#333",
     textAlign: "center",
@@ -453,16 +469,12 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   targetAudioIndicator: {
-    marginTop: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 24,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 2,
-    borderColor: "#FF6B9D",
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "#FFF5F7",
+    borderRadius: 20,
+    padding: 8,
   },
   targetAudioText: {
     fontSize: 18,
@@ -486,11 +498,11 @@ const styles = StyleSheet.create({
   },
   playingIndicator: {
     position: "absolute",
-    top: 12,
-    right: 12,
+    top: 8,
+    right: 8,
     backgroundColor: "#FFF5F7",
-    borderRadius: 20,
-    padding: 8,
+    borderRadius: 16,
+    padding: 6,
   },
   choiceCardPlaying: {
     borderColor: "#FF6B9D",
