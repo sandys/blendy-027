@@ -51,43 +51,92 @@ export default function WordBuilderScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
 
-    Animated.parallel([
-      Animated.sequence([
-        Animated.timing(letter1Scale, {
-          toValue: 1.2,
-          duration: 200,
+    const isTwoLetterWord = exerciseData?.letters.length === 2;
+
+    if (isTwoLetterWord) {
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(letter1Scale, {
+            toValue: 1.2,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(letter1Scale, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(letter2Scale, {
+            toValue: 1.2,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(letter2Scale, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start(() => {
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        setStage("complete");
+        setShowFeedback(true);
+
+        setTimeout(() => {
+          const nextExerciseIndex = exerciseIndex + 1;
+          if (lesson && nextExerciseIndex < lesson.exercises.length) {
+            router.replace({
+              pathname: "/games/word-builder",
+              params: { lesson: lessonNumber, exercise: nextExerciseIndex },
+            });
+          } else {
+            router.back();
+          }
+        }, 2500);
+      });
+    } else {
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(letter1Scale, {
+            toValue: 1.2,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(letter1Scale, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(letter2Scale, {
+            toValue: 1.2,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(letter2Scale, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.spring(mergedScale, {
+          toValue: 1.3,
           useNativeDriver: true,
+          friction: 3,
         }),
-        Animated.timing(letter1Scale, {
-          toValue: 0,
-          duration: 300,
+      ]).start(() => {
+        Animated.spring(mergedScale, {
+          toValue: 1,
           useNativeDriver: true,
-        }),
-      ]),
-      Animated.sequence([
-        Animated.timing(letter2Scale, {
-          toValue: 1.2,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(letter2Scale, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.spring(mergedScale, {
-        toValue: 1.3,
-        useNativeDriver: true,
-        friction: 3,
-      }),
-    ]).start(() => {
-      Animated.spring(mergedScale, {
-        toValue: 1,
-        useNativeDriver: true,
-      }).start();
-      setStage("first-blend");
-    });
+        }).start();
+        setStage("first-blend");
+      });
+    }
   };
 
   const handleFinalBlend = () => {
@@ -134,9 +183,12 @@ export default function WordBuilderScreen() {
   };
 
   const getInstructionText = () => {
+    const isTwoLetterWord = exerciseData?.letters.length === 2;
     switch (stage) {
       case "initial":
-        return "Tap to blend the first two sounds";
+        return isTwoLetterWord
+          ? "Tap to blend the sounds together"
+          : "Tap to blend the first two sounds";
       case "first-blend":
         return "Now add the last sound!";
       case "complete":
