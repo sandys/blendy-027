@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import { Volume2 } from "lucide-react-native";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
 export default function WordTapperScreen() {
   const insets = useSafeAreaInsets();
@@ -36,6 +36,10 @@ export default function WordTapperScreen() {
   const [showSubmit, setShowSubmit] = useState<boolean>(false);
   const [showFeedback, setShowFeedback] = useState<boolean>(false);
   const [isCorrect, setIsCorrect] = useState<boolean>(false);
+  const [isPlayingSentence, setIsPlayingSentence] = useState<boolean>(false);
+  const audioLoopRef = useRef<boolean>(true);
+  const isCorrectAnswerGiven = useRef<boolean>(false);
+  const flashAnim = useRef(new Animated.Value(0)).current;
 
   const circleAnims = useMemo(() => {
     const anims: Animated.Value[] = [];
@@ -44,6 +48,51 @@ export default function WordTapperScreen() {
     }
     return anims;
   }, [wordCount]);
+
+  useEffect(() => {
+    if (!sentence) return;
+
+    audioLoopRef.current = true;
+    isCorrectAnswerGiven.current = false;
+
+    const playInitialFeedback = async () => {
+      Animated.sequence([
+        Animated.timing(flashAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+        Animated.timing(flashAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+      ]).start();
+      
+      if (Platform.OS !== "web") {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+    };
+
+    const playAudioLoop = async () => {
+      await playInitialFeedback();
+      
+      while (audioLoopRef.current && !isCorrectAnswerGiven.current) {
+        setIsPlayingSentence(true);
+        await speakText(sentence, { rate: 0.7 });
+        setIsPlayingSentence(false);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    };
+
+    playAudioLoop();
+
+    return () => {
+      audioLoopRef.current = false;
+    };
+  }, [exerciseIndex, sentence, flashAnim]);
 
   if (!exercise || exercise.exercise_type !== "Word Tapper") {
     return (
@@ -80,6 +129,10 @@ export default function WordTapperScreen() {
     setShowFeedback(true);
 
     if (correct) {
+      isCorrectAnswerGiven.current = true;
+      audioLoopRef.current = false;
+      setIsPlayingSentence(false);
+
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -109,36 +162,48 @@ export default function WordTapperScreen() {
     }
   };
 
+  const flashColor = flashAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(78, 205, 196, 0)', 'rgba(78, 205, 196, 0.3)'],
+  });
+
   return (
-    <View
-      style={[
-        styles.container,
-        { paddingTop: insets.top, paddingBottom: insets.bottom },
-      ]}
-    >
-      <View style={styles.header}>
-        <Text style={styles.progressText}>
-          Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
-        </Text>
-        <Text style={styles.instructionText}>
-          Tap a circle for each word you hear
-        </Text>
-      </View>
+    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>
+      <Animated.View 
+        style={[
+          styles.flashOverlay,
+          { backgroundColor: flashColor }
+        ]} 
+        pointerEvents="none"
+      />
+      <View style={styles.landscapeContent}>
+        <View style={styles.leftSection}>
+          <View style={styles.header}>
+            <Text style={styles.progressText}>
+              Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
+            </Text>
+            <Text style={styles.instructionText}>
+              Tap a circle for each word you hear
+            </Text>
+          </View>
 
-      <View style={styles.sentenceContainer}>
-        <View style={styles.sentenceCard}>
-          <Text style={styles.sentenceText}>{sentence}</Text>
-          <TouchableOpacity
-            style={styles.audioButton}
-            onPress={() => speakText(sentence, { rate: 0.7 })}
-            activeOpacity={0.7}
-          >
-            <Volume2 size={28} color="#4ECDC4" />
-          </TouchableOpacity>
+          <View style={styles.sentenceContainer}>
+            <View style={[
+              styles.sentenceCard,
+              isPlayingSentence && styles.sentenceCardPlaying
+            ]}>
+              <Text style={styles.sentenceText}>{sentence}</Text>
+              {isPlayingSentence && (
+                <View style={styles.audioIndicator}>
+                  <Volume2 size={28} color="#4ECDC4" />
+                </View>
+              )}
+            </View>
+          </View>
         </View>
-      </View>
 
-      <View style={styles.circlesContainer}>
+        <View style={styles.rightSection}>
+          <View style={styles.circlesContainer}>
         {Array.from({ length: wordCount }).map((_, index) => {
           const isTapped = index < tapCount;
           const scale = circleAnims[index]
@@ -167,35 +232,37 @@ export default function WordTapperScreen() {
             </TouchableOpacity>
           );
         })}
-      </View>
+          </View>
 
-      <View style={styles.counterContainer}>
-        <Text style={styles.counterText}>
-          Words tapped: {tapCount} / {wordCount}
-        </Text>
-      </View>
+          <View style={styles.counterContainer}>
+            <Text style={styles.counterText}>
+              Words tapped: {tapCount} / {wordCount}
+            </Text>
+          </View>
 
-      {showSubmit && !showFeedback && (
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>Check Answer</Text>
-        </TouchableOpacity>
-      )}
+          {showSubmit && !showFeedback && (
+            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+              <Text style={styles.submitButtonText}>Check Answer</Text>
+            </TouchableOpacity>
+          )}
 
-      {showFeedback && (
-        <View
-          style={[
-            styles.feedbackContainer,
-            isCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect,
-          ]}
-        >
-          <Text style={styles.feedbackEmoji}>
-            {isCorrect ? "🎉" : "🤔"}
-          </Text>
-          <Text style={styles.feedbackText}>
-            {isCorrect ? "Perfect!" : "Try again!"}
-          </Text>
+          {showFeedback && (
+            <View
+              style={[
+                styles.feedbackContainer,
+                isCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect,
+              ]}
+            >
+              <Text style={styles.feedbackEmoji}>
+                {isCorrect ? "🎉" : "🤔"}
+              </Text>
+              <Text style={styles.feedbackText}>
+                {isCorrect ? "Perfect!" : "Try again!"}
+              </Text>
+            </View>
+          )}
         </View>
-      )}
+      </View>
     </View>
   );
 }
@@ -204,10 +271,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F0F8FF",
+  },
+  landscapeContent: {
+    flex: 1,
+    flexDirection: "row",
     padding: 20,
   },
+  leftSection: {
+    flex: 0.4,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingRight: 20,
+  },
+  rightSection: {
+    flex: 0.6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   header: {
-    marginTop: 20,
     marginBottom: 30,
     alignItems: "center",
   },
@@ -226,36 +307,58 @@ const styles = StyleSheet.create({
   },
   sentenceContainer: {
     alignItems: "center",
-    marginBottom: 60,
+    justifyContent: "center",
+    flex: 1,
   },
   sentenceCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 30,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
-    minWidth: width * 0.7,
+    minWidth: 250,
+    borderWidth: 4,
+    borderColor: "#4ECDC4",
+  },
+  sentenceCardPlaying: {
+    borderColor: "#4ECDC4",
+    borderWidth: 5,
+    backgroundColor: "#E8F9F8",
+    shadowColor: "#4ECDC4",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   sentenceText: {
     fontSize: 28,
-    fontWeight: "600" as const,
+    fontWeight: "700" as const,
     color: "#333",
     textAlign: "center",
+  },
+  audioIndicator: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "#E8F9F8",
+    borderRadius: 20,
+    padding: 8,
   },
   circlesContainer: {
     flexDirection: "row",
     justifyContent: "center",
     flexWrap: "wrap",
     gap: 20,
-    marginBottom: 30,
+    marginBottom: 20,
+    maxWidth: "100%",
   },
   circle: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+    width: Math.min((height - 100) / 4, 100),
+    height: Math.min((height - 100) / 4, 100),
+    borderRadius: Math.min((height - 100) / 8, 50),
     borderWidth: 5,
     borderColor: "#4ECDC4",
     backgroundColor: "#FFFFFF",
@@ -297,12 +400,12 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   feedbackContainer: {
-    padding: 30,
-    borderRadius: 24,
+    padding: 20,
+    borderRadius: 20,
     alignSelf: "center",
     marginTop: 20,
     alignItems: "center",
-    minWidth: width * 0.6,
+    minWidth: 200,
   },
   feedbackCorrect: {
     backgroundColor: "#E8F5E9",
@@ -325,13 +428,12 @@ const styles = StyleSheet.create({
     color: "#F44336",
     textAlign: "center",
   },
-  audioButton: {
-    marginTop: 20,
-    padding: 12,
-    borderRadius: 24,
-    backgroundColor: "#E8F9F8",
-    alignItems: "center",
-    justifyContent: "center",
-    alignSelf: "center",
+  flashOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
   },
 });

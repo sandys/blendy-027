@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,8 +12,10 @@ import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
+import { speakText } from "@/utils/audio";
+import { Volume2 } from "lucide-react-native";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
 type BuildStage = "initial" | "first-blend" | "final-blend" | "complete";
 
@@ -32,11 +34,66 @@ export default function WordBuilderScreen() {
 
   const [stage, setStage] = useState<BuildStage>("initial");
   const [showFeedback, setShowFeedback] = useState<boolean>(false);
+  const [playingLetterIndex, setPlayingLetterIndex] = useState<number | null>(null);
+  const audioLoopRef = useRef<boolean>(true);
+  const isCorrectAnswerGiven = useRef<boolean>(false);
+  const flashAnim = useRef(new Animated.Value(0)).current;
 
   const letter1Scale = useRef(new Animated.Value(1)).current;
   const letter2Scale = useRef(new Animated.Value(1)).current;
   const letter3Scale = useRef(new Animated.Value(1)).current;
   const mergedScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!exerciseData || stage !== "initial") return;
+
+    audioLoopRef.current = true;
+    isCorrectAnswerGiven.current = false;
+
+    const playInitialFeedback = async () => {
+      Animated.sequence([
+        Animated.timing(flashAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+        Animated.timing(flashAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+      ]).start();
+      
+      if (Platform.OS !== "web") {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+    };
+
+    const playAudioLoop = async () => {
+      await playInitialFeedback();
+      
+      while (audioLoopRef.current && !isCorrectAnswerGiven.current && stage === "initial") {
+        for (let i = 0; i < exerciseData.letters.length; i++) {
+          if (!audioLoopRef.current || isCorrectAnswerGiven.current) break;
+          
+          setPlayingLetterIndex(i);
+          await speakText(exerciseData.letters[i]);
+          await new Promise(resolve => setTimeout(resolve, 600));
+        }
+        
+        setPlayingLetterIndex(null);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+    };
+
+    playAudioLoop();
+
+    return () => {
+      audioLoopRef.current = false;
+    };
+  }, [exerciseIndex, exerciseData, stage, flashAnim]);
 
   if (!exercise || exercise.exercise_type !== "Word Builder") {
     return (
@@ -80,6 +137,10 @@ export default function WordBuilderScreen() {
           }),
         ]),
       ]).start(() => {
+        isCorrectAnswerGiven.current = true;
+        audioLoopRef.current = false;
+        setPlayingLetterIndex(null);
+
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
@@ -140,6 +201,10 @@ export default function WordBuilderScreen() {
   };
 
   const handleFinalBlend = () => {
+    isCorrectAnswerGiven.current = true;
+    audioLoopRef.current = false;
+    setPlayingLetterIndex(null);
+
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
@@ -198,18 +263,25 @@ export default function WordBuilderScreen() {
     }
   };
 
+  const flashColor = flashAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(33, 150, 243, 0)', 'rgba(33, 150, 243, 0.3)'],
+  });
+
   return (
-    <View
-      style={[
-        styles.container,
-        { paddingTop: insets.top, paddingBottom: insets.bottom },
-      ]}
-    >
+    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>
+      <Animated.View 
+        style={[
+          styles.flashOverlay,
+          { backgroundColor: flashColor }
+        ]} 
+        pointerEvents="none"
+      />
       <View style={styles.header}>
-        <Text style={styles.instructionText}>{getInstructionText()}</Text>
         <Text style={styles.progressText}>
           Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
         </Text>
+        <Text style={styles.instructionText}>{getInstructionText()}</Text>
       </View>
 
       <View style={styles.buildArea}>
@@ -219,23 +291,35 @@ export default function WordBuilderScreen() {
               <Animated.View
                 style={[
                   styles.letterTile,
+                  playingLetterIndex === 0 && styles.letterTilePlaying,
                   { transform: [{ scale: letter1Scale }] },
                 ]}
               >
                 <Text style={styles.letterText}>
                   {exerciseData?.letters[0]}
                 </Text>
+                {playingLetterIndex === 0 && (
+                  <View style={styles.audioIndicator}>
+                    <Volume2 size={20} color="#FFFFFF" />
+                  </View>
+                )}
               </Animated.View>
 
               <Animated.View
                 style={[
                   styles.letterTile,
+                  playingLetterIndex === 1 && styles.letterTilePlaying,
                   { transform: [{ scale: letter2Scale }] },
                 ]}
               >
                 <Text style={styles.letterText}>
                   {exerciseData?.letters[1]}
                 </Text>
+                {playingLetterIndex === 1 && (
+                  <View style={styles.audioIndicator}>
+                    <Volume2 size={20} color="#FFFFFF" />
+                  </View>
+                )}
               </Animated.View>
             </View>
 
@@ -267,12 +351,18 @@ export default function WordBuilderScreen() {
               <Animated.View
                 style={[
                   styles.letterTile,
+                  playingLetterIndex === 2 && styles.letterTilePlaying,
                   { transform: [{ scale: letter3Scale }] },
                 ]}
               >
                 <Text style={styles.letterText}>
                   {exerciseData?.letters[2]}
                 </Text>
+                {playingLetterIndex === 2 && (
+                  <View style={styles.audioIndicator}>
+                    <Volume2 size={20} color="#FFFFFF" />
+                  </View>
+                )}
               </Animated.View>
             </View>
 
@@ -312,11 +402,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#E3F2FD",
-    padding: 20,
   },
   header: {
-    marginTop: 20,
-    marginBottom: 30,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    marginBottom: 20,
     alignItems: "center",
   },
   instructionText: {
@@ -342,8 +432,8 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   letterTile: {
-    width: 100,
-    height: 100,
+    width: Math.min(height * 0.18, 120),
+    height: Math.min(height * 0.18, 120),
     borderRadius: 20,
     backgroundColor: "#2196F3",
     justifyContent: "center",
@@ -354,14 +444,31 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
+  letterTilePlaying: {
+    borderWidth: 4,
+    borderColor: "#FFFFFF",
+    shadowColor: "#2196F3",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  audioIndicator: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    borderRadius: 16,
+    padding: 4,
+  },
   letterText: {
     fontSize: 48,
     fontWeight: "800" as const,
     color: "#FFFFFF",
   },
   mergedTile: {
-    width: 140,
-    height: 100,
+    width: Math.min(height * 0.25, 160),
+    height: Math.min(height * 0.18, 120),
     borderRadius: 20,
     backgroundColor: "#FF6B9D",
     justifyContent: "center",
@@ -419,13 +526,13 @@ const styles = StyleSheet.create({
   },
   feedbackContainer: {
     position: "absolute",
-    bottom: 100,
+    bottom: 80,
     alignSelf: "center",
     backgroundColor: "#E8F5E9",
-    padding: 30,
-    borderRadius: 24,
+    padding: 20,
+    borderRadius: 20,
     alignItems: "center",
-    minWidth: width * 0.6,
+    minWidth: 200,
   },
   feedbackEmoji: {
     fontSize: 72,
@@ -441,5 +548,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#F44336",
     textAlign: "center",
+  },
+  flashOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
   },
 });

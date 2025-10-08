@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
+import { speakText } from "@/utils/audio";
+import { Volume2 } from "lucide-react-native";
 
 const { width, height } = Dimensions.get("window");
 
@@ -30,10 +32,67 @@ export default function SoundSlideScreen() {
 
   const [stage, setStage] = useState<"initial" | "merged" | "complete">("initial");
   const [showFeedback, setShowFeedback] = useState<boolean>(false);
+  const [isPlayingOnset, setIsPlayingOnset] = useState<boolean>(false);
+  const [isPlayingRime, setIsPlayingRime] = useState<boolean>(false);
+  const audioLoopRef = useRef<boolean>(true);
+  const isCorrectAnswerGiven = useRef<boolean>(false);
+  const flashAnim = useRef(new Animated.Value(0)).current;
 
   const onsetPosition = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const onsetScale = useRef(new Animated.Value(1)).current;
   const rimeScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!exerciseData) return;
+
+    audioLoopRef.current = true;
+    isCorrectAnswerGiven.current = false;
+
+    const playInitialFeedback = async () => {
+      Animated.sequence([
+        Animated.timing(flashAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+        Animated.timing(flashAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+      ]).start();
+      
+      if (Platform.OS !== "web") {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+    };
+
+    const playAudioLoop = async () => {
+      await playInitialFeedback();
+      
+      while (audioLoopRef.current && !isCorrectAnswerGiven.current) {
+        setIsPlayingOnset(true);
+        await speakText(exerciseData.onset);
+        setIsPlayingOnset(false);
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        if (!audioLoopRef.current || isCorrectAnswerGiven.current) break;
+        
+        setIsPlayingRime(true);
+        await speakText(exerciseData.rime);
+        setIsPlayingRime(false);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+    };
+
+    playAudioLoop();
+
+    return () => {
+      audioLoopRef.current = false;
+    };
+  }, [exerciseIndex, exerciseData, flashAnim]);
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => stage === "initial",
@@ -60,6 +119,11 @@ export default function SoundSlideScreen() {
         );
 
         if (distance < 100) {
+          isCorrectAnswerGiven.current = true;
+          audioLoopRef.current = false;
+          setIsPlayingOnset(false);
+          setIsPlayingRime(false);
+
           if (Platform.OS !== "web") {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }
@@ -129,19 +193,26 @@ export default function SoundSlideScreen() {
     );
   }
 
+  const flashColor = flashAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(255, 211, 61, 0)', 'rgba(255, 211, 61, 0.3)'],
+  });
+
   return (
-    <View
-      style={[
-        styles.container,
-        { paddingTop: insets.top, paddingBottom: insets.bottom },
-      ]}
-    >
+    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>
+      <Animated.View 
+        style={[
+          styles.flashOverlay,
+          { backgroundColor: flashColor }
+        ]} 
+        pointerEvents="none"
+      />
       <View style={styles.header}>
-        <Text style={styles.instructionText}>
-          Drag the sounds together to make a word!
-        </Text>
         <Text style={styles.progressText}>
           Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
+        </Text>
+        <Text style={styles.instructionText}>
+          Drag the sounds together to make a word!
         </Text>
       </View>
 
@@ -151,6 +222,7 @@ export default function SoundSlideScreen() {
             <Animated.View
               style={[
                 styles.onsetTile,
+                isPlayingOnset && styles.tilePlaying,
                 {
                   transform: [
                     { translateX: onsetPosition.x },
@@ -162,17 +234,28 @@ export default function SoundSlideScreen() {
               {...panResponder.panHandlers}
             >
               <Text style={styles.tileText}>{exerciseData?.onset}</Text>
+              {isPlayingOnset && (
+                <View style={styles.audioIndicator}>
+                  <Volume2 size={20} color="#FFFFFF" />
+                </View>
+              )}
             </Animated.View>
 
             <Animated.View
               style={[
                 styles.rimeTile,
+                isPlayingRime && styles.tilePlaying,
                 {
                   transform: [{ scale: rimeScale }],
                 },
               ]}
             >
               <Text style={styles.tileText}>{exerciseData?.rime}</Text>
+              {isPlayingRime && (
+                <View style={styles.audioIndicator}>
+                  <Volume2 size={20} color="#FFFFFF" />
+                </View>
+              )}
             </Animated.View>
 
             <View style={styles.guideContainer}>
@@ -205,11 +288,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFF8E1",
-    padding: 20,
   },
   header: {
-    marginTop: 20,
-    marginBottom: 30,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    marginBottom: 20,
     alignItems: "center",
   },
   instructionText: {
@@ -233,9 +316,9 @@ const styles = StyleSheet.create({
   onsetTile: {
     position: "absolute",
     left: width * 0.15,
-    top: height * 0.35,
-    width: 120,
-    height: 120,
+    top: height * 0.4,
+    width: Math.min(height * 0.2, 140),
+    height: Math.min(height * 0.2, 140),
     borderRadius: 20,
     backgroundColor: "#FF6B9D",
     justifyContent: "center",
@@ -249,9 +332,9 @@ const styles = StyleSheet.create({
   rimeTile: {
     position: "absolute",
     right: width * 0.15,
-    top: height * 0.35,
-    width: 120,
-    height: 120,
+    top: height * 0.4,
+    width: Math.min(height * 0.2, 140),
+    height: Math.min(height * 0.2, 140),
     borderRadius: 20,
     backgroundColor: "#4ECDC4",
     justifyContent: "center",
@@ -262,6 +345,23 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
+  tilePlaying: {
+    borderWidth: 4,
+    borderColor: "#FFFFFF",
+    shadowColor: "#FFD93D",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  audioIndicator: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    borderRadius: 16,
+    padding: 6,
+  },
   tileText: {
     fontSize: 48,
     fontWeight: "800" as const,
@@ -269,7 +369,7 @@ const styles = StyleSheet.create({
   },
   guideContainer: {
     position: "absolute",
-    top: height * 0.25,
+    top: height * 0.3,
     left: width * 0.15,
   },
   guideText: {
@@ -303,13 +403,13 @@ const styles = StyleSheet.create({
   },
   feedbackContainer: {
     position: "absolute",
-    bottom: 100,
+    bottom: 80,
     alignSelf: "center",
     backgroundColor: "#E8F5E9",
-    padding: 30,
-    borderRadius: 24,
+    padding: 20,
+    borderRadius: 20,
     alignItems: "center",
-    minWidth: width * 0.6,
+    minWidth: 200,
   },
   feedbackEmoji: {
     fontSize: 72,
@@ -325,5 +425,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#F44336",
     textAlign: "center",
+  },
+  flashOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
   },
 });

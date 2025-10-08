@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -12,8 +12,10 @@ import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
+import { speakText } from "@/utils/audio";
+import { Volume2 } from "lucide-react-native";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
 export default function SyllableSquishScreen() {
   const insets = useSafeAreaInsets();
@@ -34,6 +36,10 @@ export default function SyllableSquishScreen() {
   const [tapCount, setTapCount] = useState<number>(0);
   const [showFeedback, setShowFeedback] = useState<boolean>(false);
   const [isCorrect, setIsCorrect] = useState<boolean>(false);
+  const [isPlayingWord, setIsPlayingWord] = useState<boolean>(false);
+  const audioLoopRef = useRef<boolean>(true);
+  const isCorrectAnswerGiven = useRef<boolean>(false);
+  const flashAnim = useRef(new Animated.Value(0)).current;
 
   const buttonScale = useMemo(() => new Animated.Value(1), []);
   const progressAnims = useMemo(() => {
@@ -43,6 +49,51 @@ export default function SyllableSquishScreen() {
     }
     return anims;
   }, [syllableCount]);
+
+  useEffect(() => {
+    if (!word) return;
+
+    audioLoopRef.current = true;
+    isCorrectAnswerGiven.current = false;
+
+    const playInitialFeedback = async () => {
+      Animated.sequence([
+        Animated.timing(flashAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+        Animated.timing(flashAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+      ]).start();
+      
+      if (Platform.OS !== "web") {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+    };
+
+    const playAudioLoop = async () => {
+      await playInitialFeedback();
+      
+      while (audioLoopRef.current && !isCorrectAnswerGiven.current) {
+        setIsPlayingWord(true);
+        await speakText(word, { rate: 0.8 });
+        setIsPlayingWord(false);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    };
+
+    playAudioLoop();
+
+    return () => {
+      audioLoopRef.current = false;
+    };
+  }, [exerciseIndex, word, flashAnim]);
 
   if (!exercise || exercise.exercise_type !== "Syllable Squish") {
     return (
@@ -85,6 +136,9 @@ export default function SyllableSquishScreen() {
     }
 
     if (newCount === syllableCount) {
+      isCorrectAnswerGiven.current = true;
+      audioLoopRef.current = false;
+      setIsPlayingWord(false);
       setIsCorrect(true);
       setShowFeedback(true);
 
@@ -119,30 +173,49 @@ export default function SyllableSquishScreen() {
     }
   };
 
+  const flashColor = flashAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(255, 184, 77, 0)', 'rgba(255, 184, 77, 0.3)'],
+  });
+
   return (
-    <View
-      style={[
-        styles.container,
-        { paddingTop: insets.top, paddingBottom: insets.bottom },
-      ]}
-    >
-      <View style={styles.header}>
-        <Text style={styles.progressText}>
-          Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
-        </Text>
-        <Text style={styles.instructionText}>
-          Tap the button for each syllable
-        </Text>
-      </View>
+    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>
+      <Animated.View 
+        style={[
+          styles.flashOverlay,
+          { backgroundColor: flashColor }
+        ]} 
+        pointerEvents="none"
+      />
+      <View style={styles.landscapeContent}>
+        <View style={styles.leftSection}>
+          <View style={styles.header}>
+            <Text style={styles.progressText}>
+              Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
+            </Text>
+            <Text style={styles.instructionText}>
+              Tap the button for each syllable
+            </Text>
+          </View>
 
-      <View style={styles.wordContainer}>
-        <View style={styles.wordCard}>
-          <Text style={styles.wordEmoji}>{image}</Text>
-          <Text style={styles.wordText}>{word}</Text>
+          <View style={styles.wordContainer}>
+            <View style={[
+              styles.wordCard,
+              isPlayingWord && styles.wordCardPlaying
+            ]}>
+              <Text style={styles.wordEmoji}>{image}</Text>
+              <Text style={styles.wordText}>{word}</Text>
+              {isPlayingWord && (
+                <View style={styles.audioIndicator}>
+                  <Volume2 size={28} color="#FFB84D" />
+                </View>
+              )}
+            </View>
+          </View>
         </View>
-      </View>
 
-      <View style={styles.progressBarContainer}>
+        <View style={styles.rightSection}>
+          <View style={styles.progressBarContainer}>
         {Array.from({ length: syllableCount }).map((_, index) => {
           const scale = progressAnims[index]
             ? progressAnims[index].interpolate({
@@ -171,9 +244,9 @@ export default function SyllableSquishScreen() {
             />
           );
         })}
-      </View>
+          </View>
 
-      <View style={styles.buttonContainer}>
+          <View style={styles.buttonContainer}>
         <TouchableOpacity
           onPress={handleSquishTap}
           disabled={showFeedback}
@@ -191,29 +264,31 @@ export default function SyllableSquishScreen() {
             <Text style={styles.squishButtonEmoji}>👆</Text>
           </Animated.View>
         </TouchableOpacity>
-      </View>
+          </View>
 
-      <View style={styles.counterContainer}>
-        <Text style={styles.counterText}>
-          Taps: {tapCount} / {syllableCount}
-        </Text>
-      </View>
+          <View style={styles.counterContainer}>
+            <Text style={styles.counterText}>
+              Taps: {tapCount} / {syllableCount}
+            </Text>
+          </View>
 
-      {showFeedback && (
-        <View
-          style={[
-            styles.feedbackContainer,
-            isCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect,
-          ]}
-        >
-          <Text style={styles.feedbackEmoji}>
-            {isCorrect ? "🎉" : "🤔"}
-          </Text>
-          <Text style={styles.feedbackText}>
-            {isCorrect ? "Perfect!" : "Oops! Try again!"}
-          </Text>
+          {showFeedback && (
+            <View
+              style={[
+                styles.feedbackContainer,
+                isCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect,
+              ]}
+            >
+              <Text style={styles.feedbackEmoji}>
+                {isCorrect ? "🎉" : "🤔"}
+              </Text>
+              <Text style={styles.feedbackText}>
+                {isCorrect ? "Perfect!" : "Oops! Try again!"}
+              </Text>
+            </View>
+          )}
         </View>
-      )}
+      </View>
     </View>
   );
 }
@@ -222,10 +297,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFF9E6",
+  },
+  landscapeContent: {
+    flex: 1,
+    flexDirection: "row",
     padding: 20,
   },
+  leftSection: {
+    flex: 0.4,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingRight: 20,
+  },
+  rightSection: {
+    flex: 0.6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   header: {
-    marginTop: 20,
     marginBottom: 30,
     alignItems: "center",
   },
@@ -244,11 +333,12 @@ const styles = StyleSheet.create({
   },
   wordContainer: {
     alignItems: "center",
-    marginBottom: 40,
+    justifyContent: "center",
+    flex: 1,
   },
   wordCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 30,
     alignItems: "center",
     shadowColor: "#000",
@@ -256,7 +346,27 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
-    minWidth: width * 0.6,
+    minWidth: 200,
+    borderWidth: 4,
+    borderColor: "#FFB84D",
+  },
+  wordCardPlaying: {
+    borderColor: "#FFB84D",
+    borderWidth: 5,
+    backgroundColor: "#FFF9E6",
+    shadowColor: "#FFB84D",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  audioIndicator: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "#FFF9E6",
+    borderRadius: 20,
+    padding: 8,
   },
   wordEmoji: {
     fontSize: 80,
@@ -271,13 +381,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     gap: 12,
-    marginBottom: 50,
+    marginBottom: 30,
     paddingHorizontal: 20,
   },
   progressSegment: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: Math.min((height - 100) / 5, 60),
+    height: Math.min((height - 100) / 5, 60),
+    borderRadius: Math.min((height - 100) / 10, 30),
     backgroundColor: "#FFB84D",
   },
   buttonContainer: {
@@ -285,9 +395,9 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   squishButton: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: Math.min(height * 0.35, 200),
+    height: Math.min(height * 0.35, 200),
+    borderRadius: Math.min(height * 0.175, 100),
     backgroundColor: "#FFB84D",
     justifyContent: "center",
     alignItems: "center",
@@ -317,13 +427,11 @@ const styles = StyleSheet.create({
     color: "#666",
   },
   feedbackContainer: {
-    position: "absolute",
-    bottom: 100,
-    left: 20,
-    right: 20,
-    padding: 30,
-    borderRadius: 24,
+    padding: 20,
+    borderRadius: 20,
     alignItems: "center",
+    marginTop: 20,
+    minWidth: 200,
   },
   feedbackCorrect: {
     backgroundColor: "#E8F5E9",
@@ -345,5 +453,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#F44336",
     textAlign: "center",
+  },
+  flashOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
   },
 });

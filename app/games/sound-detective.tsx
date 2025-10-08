@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -12,8 +12,10 @@ import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
+import { speakText } from "@/utils/audio";
+import { Volume2 } from "lucide-react-native";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
 export default function SoundDetectiveScreen() {
   const insets = useSafeAreaInsets();
@@ -37,10 +39,59 @@ export default function SoundDetectiveScreen() {
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
   const [showFeedback, setShowFeedback] = useState<boolean>(false);
   const [isCorrect, setIsCorrect] = useState<boolean>(false);
+  const [isPlayingWord, setIsPlayingWord] = useState<boolean>(false);
+  const audioLoopRef = useRef<boolean>(true);
+  const isCorrectAnswerGiven = useRef<boolean>(false);
+  const flashAnim = useRef(new Animated.Value(0)).current;
 
   const scaleAnims = React.useRef(
     exerciseData?.choices.map(() => new Animated.Value(1)) || []
   ).current;
+
+  useEffect(() => {
+    if (!exerciseData) return;
+
+    audioLoopRef.current = true;
+    isCorrectAnswerGiven.current = false;
+
+    const playInitialFeedback = async () => {
+      Animated.sequence([
+        Animated.timing(flashAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+        Animated.timing(flashAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+      ]).start();
+      
+      if (Platform.OS !== "web") {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+    };
+
+    const playAudioLoop = async () => {
+      await playInitialFeedback();
+      
+      while (audioLoopRef.current && !isCorrectAnswerGiven.current) {
+        setIsPlayingWord(true);
+        await speakText(exerciseData.word, { rate: 0.8 });
+        setIsPlayingWord(false);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    };
+
+    playAudioLoop();
+
+    return () => {
+      audioLoopRef.current = false;
+    };
+  }, [exerciseIndex, exerciseData, flashAnim]);
 
   if (!exercise || exercise.exercise_type !== "Sound Detective") {
     return (
@@ -59,6 +110,10 @@ export default function SoundDetectiveScreen() {
     setShowFeedback(true);
 
     if (correct) {
+      isCorrectAnswerGiven.current = true;
+      audioLoopRef.current = false;
+      setIsPlayingWord(false);
+
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -124,28 +179,49 @@ export default function SoundDetectiveScreen() {
     }
   };
 
+  const flashColor = flashAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(76, 175, 80, 0)', 'rgba(76, 175, 80, 0.3)'],
+  });
+
   return (
-    <View
-      style={[
-        styles.container,
-        { paddingTop: insets.top, paddingBottom: insets.bottom },
-      ]}
-    >
-      <View style={styles.header}>
-        <Text style={styles.instructionText}>
-          What is the {getPositionText()} sound?
-        </Text>
-        <Text style={styles.progressText}>
-          Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
-        </Text>
-      </View>
+    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>
+      <Animated.View 
+        style={[
+          styles.flashOverlay,
+          { backgroundColor: flashColor }
+        ]} 
+        pointerEvents="none"
+      />
+      <View style={styles.landscapeContent}>
+        <View style={styles.leftSection}>
+          <View style={styles.header}>
+            <Text style={styles.progressText}>
+              Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
+            </Text>
+            <Text style={styles.instructionText}>
+              What is the {getPositionText()} sound?
+            </Text>
+          </View>
 
-      <View style={styles.wordContainer}>
-        <Text style={styles.wordEmoji}>{exerciseData?.image}</Text>
-        <Text style={styles.wordText}>{exerciseData?.word}</Text>
-      </View>
+          <View style={styles.wordContainer}>
+            <View style={[
+              styles.wordCard,
+              isPlayingWord && styles.wordCardPlaying
+            ]}>
+              <Text style={styles.wordEmoji}>{exerciseData?.image}</Text>
+              <Text style={styles.wordText}>{exerciseData?.word}</Text>
+              {isPlayingWord && (
+                <View style={styles.audioIndicator}>
+                  <Volume2 size={28} color="#4CAF50" />
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
 
-      <View style={styles.choicesContainer}>
+        <View style={styles.rightSection}>
+          <View style={styles.choicesContainer}>
         {exerciseData?.choices.map((choice, index) => {
           const isSelected = selectedChoice === choice;
           const isCorrectChoice = choice === exerciseData?.correctSound;
@@ -181,21 +257,23 @@ export default function SoundDetectiveScreen() {
             </TouchableOpacity>
           );
         })}
-      </View>
+          </View>
 
-      {showFeedback && (
-        <View
-          style={[
-            styles.feedbackContainer,
-            isCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect,
-          ]}
-        >
-          <Text style={styles.feedbackEmoji}>{isCorrect ? "🎉" : "🤔"}</Text>
-          <Text style={styles.feedbackText}>
-            {isCorrect ? "Perfect!" : "Try again!"}
-          </Text>
+          {showFeedback && (
+            <View
+              style={[
+                styles.feedbackContainer,
+                isCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect,
+              ]}
+            >
+              <Text style={styles.feedbackEmoji}>{isCorrect ? "🎉" : "🤔"}</Text>
+              <Text style={styles.feedbackText}>
+                {isCorrect ? "Perfect!" : "Try again!"}
+              </Text>
+            </View>
+          )}
         </View>
-      )}
+      </View>
     </View>
   );
 }
@@ -204,10 +282,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#E8F5E9",
+  },
+  landscapeContent: {
+    flex: 1,
+    flexDirection: "row",
     padding: 20,
   },
+  leftSection: {
+    flex: 0.4,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingRight: 20,
+  },
+  rightSection: {
+    flex: 0.6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   header: {
-    marginTop: 20,
     marginBottom: 30,
     alignItems: "center",
   },
@@ -225,15 +317,40 @@ const styles = StyleSheet.create({
   },
   wordContainer: {
     alignItems: "center",
-    marginBottom: 60,
+    justifyContent: "center",
+    flex: 1,
+  },
+  wordCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 30,
-    padding: 40,
+    borderRadius: 24,
+    padding: 30,
+    alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
+    minWidth: 200,
+    borderWidth: 4,
+    borderColor: "#4CAF50",
+  },
+  wordCardPlaying: {
+    borderColor: "#4CAF50",
+    borderWidth: 5,
+    backgroundColor: "#E8F5E9",
+    shadowColor: "#4CAF50",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  audioIndicator: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "#E8F5E9",
+    borderRadius: 20,
+    padding: 8,
   },
   wordEmoji: {
     fontSize: 100,
@@ -249,11 +366,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexWrap: "wrap",
     gap: 20,
-    marginBottom: 40,
+    marginBottom: 20,
+    maxWidth: "100%",
   },
   choiceButton: {
-    width: 100,
-    height: 100,
+    width: Math.min((height - 100) / 3.5, 120),
+    height: Math.min((height - 100) / 3.5, 120),
     borderRadius: 20,
     backgroundColor: "#FFFFFF",
     justifyContent: "center",
@@ -283,13 +401,12 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   feedbackContainer: {
-    padding: 30,
-    borderRadius: 24,
+    padding: 20,
+    borderRadius: 20,
     alignSelf: "center",
     alignItems: "center",
-    minWidth: width * 0.6,
-    position: "absolute",
-    bottom: 80,
+    minWidth: 200,
+    marginTop: 20,
   },
   feedbackCorrect: {
     backgroundColor: "#E8F5E9",
@@ -311,5 +428,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#F44336",
     textAlign: "center",
+  },
+  flashOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
   },
 });
