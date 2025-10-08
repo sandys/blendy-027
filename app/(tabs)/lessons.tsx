@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Lock, CheckCircle, Circle } from "lucide-react-native";
+import { CheckCircle, Circle } from "lucide-react-native";
 import { useApp } from "@/contexts/AppContext";
 import { PHASES } from "@/constants/curriculum-data";
 
@@ -48,8 +48,6 @@ export default function LessonsScreen() {
                   const isCompleted = progress.completedLessons.includes(
                     lesson.lesson_number
                   );
-                  const isUnlocked =
-                    lesson.lesson_number <= progress.currentLesson;
                   const isCurrent = lesson.lesson_number === progress.currentLesson;
 
                   return (
@@ -58,42 +56,27 @@ export default function LessonsScreen() {
                       style={[
                         styles.lessonCard,
                         isCurrent && styles.lessonCardCurrent,
-                        !isUnlocked && styles.lessonCardLocked,
                       ]}
                       onPress={() => {
-                        if (isUnlocked) {
-                          router.push(`/lesson-detail?id=${lesson.lesson_number}` as never);
-                        }
+                        router.push(`/lesson-detail?id=${lesson.lesson_number}` as never);
                       }}
-                      disabled={!isUnlocked}
                       activeOpacity={0.7}
                     >
                       <View style={styles.lessonNumber}>
-                        <Text
-                          style={[
-                            styles.lessonNumberText,
-                            !isUnlocked && styles.lessonNumberTextLocked,
-                          ]}
-                        >
+                        <Text style={styles.lessonNumberText}>
                           {lesson.lesson_number}
                         </Text>
                       </View>
 
                       <View style={styles.lessonContent}>
                         <Text
-                          style={[
-                            styles.lessonTitle,
-                            !isUnlocked && styles.lessonTitleLocked,
-                          ]}
+                          style={styles.lessonTitle}
                           numberOfLines={2}
                         >
                           {lesson.title}
                         </Text>
                         <Text
-                          style={[
-                            styles.lessonDescription,
-                            !isUnlocked && styles.lessonDescriptionLocked,
-                          ]}
+                          style={styles.lessonDescription}
                           numberOfLines={2}
                         >
                           {lesson.description}
@@ -101,8 +84,7 @@ export default function LessonsScreen() {
                       </View>
 
                       <View style={styles.lessonStatus}>
-                        {!isUnlocked && <Lock size={20} color="#CCC" />}
-                        {isUnlocked && !isCompleted && (
+                        {!isCompleted && (
                           <Circle size={20} color={phase.color} />
                         )}
                         {isCompleted && (
@@ -196,9 +178,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#4ECDC4",
   },
-  lessonCardLocked: {
-    opacity: 0.5,
-  },
+
   lessonNumber: {
     width: 48,
     height: 48,
@@ -212,9 +192,7 @@ const styles = StyleSheet.create({
     fontWeight: "800" as const,
     color: "#1A1A1A",
   },
-  lessonNumberTextLocked: {
-    color: "#CCC",
-  },
+
   lessonContent: {
     flex: 1,
   },
@@ -224,16 +202,12 @@ const styles = StyleSheet.create({
     color: "#1A1A1A",
     marginBottom: 4,
   },
-  lessonTitleLocked: {
-    color: "#999",
-  },
+
   lessonDescription: {
     fontSize: 14,
     color: "#666",
   },
-  lessonDescriptionLocked: {
-    color: "#CCC",
-  },
+
   lessonStatus: {
     width: 24,
     height: 24,
