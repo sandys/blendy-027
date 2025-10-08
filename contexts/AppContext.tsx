@@ -2,7 +2,7 @@ import createContextHook from "@nkzw/create-context-hook";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { UserProgress, PhonemeCard, Lesson } from "@/types/curriculum";
-import { INITIAL_PHONEME_CARDS, SAMPLE_LESSONS } from "@/constants/curriculum-data";
+import { ALL_PHONEME_CARDS, SAMPLE_LESSONS } from "@/constants/curriculum-data";
 
 const STORAGE_KEY = "@phonics_app_progress";
 
@@ -18,7 +18,7 @@ const initialProgress: UserProgress = {
 
 export const [AppProvider, useApp] = createContextHook(() => {
   const [progress, setProgress] = useState<UserProgress>(initialProgress);
-  const [phonemeCards, setPhonemeCards] = useState<PhonemeCard[]>(INITIAL_PHONEME_CARDS);
+  const [phonemeCards, setPhonemeCards] = useState<PhonemeCard[]>(ALL_PHONEME_CARDS);
   const [lessons] = useState<Lesson[]>(SAMPLE_LESSONS);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -33,7 +33,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
         const parsed = JSON.parse(stored);
         setProgress(parsed);
         
-        const updatedCards = INITIAL_PHONEME_CARDS.map((card) => ({
+        const updatedCards = ALL_PHONEME_CARDS.map((card) => ({
           ...card,
           unlocked: parsed.unlockedPhonemes.includes(card.phoneme),
         }));
@@ -120,7 +120,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const resetProgress = useCallback(async () => {
     await AsyncStorage.removeItem(STORAGE_KEY);
     setProgress(initialProgress);
-    setPhonemeCards(INITIAL_PHONEME_CARDS);
+    setPhonemeCards(ALL_PHONEME_CARDS);
   }, []);
 
   return useMemo(
