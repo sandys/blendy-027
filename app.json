@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.rork.systematic-phonics-curriculum-children-reading-app",
+      "bundleIdentifier": "app.dinkyk2",
       "infoPlist": {
         "UIBackgroundModes": [
           "audio"
@@ -29,7 +29,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.systematic-phonics-curriculum-children-reading-app",
+      "package": "app.dinkyk2",
       "permissions": [
         "android.permission.VIBRATE",
         "RECORD_AUDIO"
