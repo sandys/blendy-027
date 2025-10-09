@@ -34,6 +34,7 @@ export default function SoundSlideScreen() {
   const [showFeedback, setShowFeedback] = useState<boolean>(false);
   const [isPlayingOnset, setIsPlayingOnset] = useState<boolean>(false);
   const [isPlayingRime, setIsPlayingRime] = useState<boolean>(false);
+  const [showSuccess, setShowSuccess] = useState<boolean>(false);
   const audioLoopRef = useRef<boolean>(true);
   const isCorrectAnswerGiven = useRef<boolean>(false);
   const flashAnim = useRef(new Animated.Value(0)).current;
@@ -74,14 +75,14 @@ export default function SoundSlideScreen() {
       
       while (audioLoopRef.current && !isCorrectAnswerGiven.current) {
         setIsPlayingOnset(true);
-        await speakText(exerciseData.onset);
+        await speakText(exerciseData.onset, { usePhoneme: true });
         setIsPlayingOnset(false);
         await new Promise(resolve => setTimeout(resolve, 800));
         
         if (!audioLoopRef.current || isCorrectAnswerGiven.current) break;
         
         setIsPlayingRime(true);
-        await speakText(exerciseData.rime);
+        await speakText(exerciseData.rime, { usePhoneme: false });
         setIsPlayingRime(false);
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
@@ -123,10 +124,13 @@ export default function SoundSlideScreen() {
           audioLoopRef.current = false;
           setIsPlayingOnset(false);
           setIsPlayingRime(false);
+          setShowSuccess(true);
 
           if (Platform.OS !== "web") {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }
+
+          speakText(exerciseData?.word || "", { usePhoneme: false, rate: 0.7 });
 
           Animated.parallel([
             Animated.spring(onsetPosition, {
@@ -150,8 +154,10 @@ export default function SoundSlideScreen() {
               }),
             ]),
           ]).start(() => {
-            setStage("merged");
-            setShowFeedback(true);
+            setTimeout(() => {
+              setStage("merged");
+              setShowFeedback(true);
+            }, 800);
 
             setTimeout(() => {
               const nextExerciseIndex = exerciseIndex + 1;
@@ -163,7 +169,7 @@ export default function SoundSlideScreen() {
               } else {
                 router.back();
               }
-            }, 2500);
+            }, 3000);
           });
         } else {
           if (Platform.OS !== "web") {
@@ -223,6 +229,7 @@ export default function SoundSlideScreen() {
               style={[
                 styles.onsetTile,
                 isPlayingOnset && styles.tilePlaying,
+                showSuccess && styles.tileSuccess,
                 {
                   transform: [
                     { translateX: onsetPosition.x },
@@ -245,6 +252,7 @@ export default function SoundSlideScreen() {
               style={[
                 styles.rimeTile,
                 isPlayingRime && styles.tilePlaying,
+                showSuccess && styles.tileSuccess,
                 {
                   transform: [{ scale: rimeScale }],
                 },
@@ -353,6 +361,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 12,
     elevation: 10,
+  },
+  tileSuccess: {
+    backgroundColor: "#4CAF50",
+    borderWidth: 4,
+    borderColor: "#FFFFFF",
+    shadowColor: "#4CAF50",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 16,
+    elevation: 12,
   },
   audioIndicator: {
     position: "absolute",

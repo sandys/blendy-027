@@ -4,7 +4,76 @@ import * as Speech from "expo-speech";
 let currentSound: Audio.Sound | null = null;
 let isSpeaking = false;
 
-export async function speakText(text: string, options?: { rate?: number; pitch?: number }): Promise<void> {
+const PHONEME_MAP: Record<string, string> = {
+  "a": "aaa",
+  "b": "buh",
+  "c": "kuh",
+  "d": "duh",
+  "e": "eh",
+  "f": "fff",
+  "g": "guh",
+  "h": "hhh",
+  "i": "ih",
+  "j": "juh",
+  "k": "kuh",
+  "l": "lll",
+  "m": "mmm",
+  "n": "nnn",
+  "o": "ah",
+  "p": "puh",
+  "q": "kuh",
+  "r": "rrr",
+  "s": "sss",
+  "t": "tuh",
+  "u": "uh",
+  "v": "vvv",
+  "w": "www",
+  "x": "ks",
+  "y": "yuh",
+  "z": "zzz",
+  "sh": "shh",
+  "ch": "chh",
+  "th": "thh",
+  "wh": "whh",
+  "ng": "ng",
+  "ck": "kuh",
+  "qu": "kwuh",
+  "ff": "fff",
+  "ll": "lll",
+  "ss": "sss",
+  "bl": "bluh",
+  "cl": "kluh",
+  "fl": "fluh",
+  "pl": "pluh",
+  "sl": "sluh",
+  "gl": "gluh",
+  "br": "bruh",
+  "cr": "kruh",
+  "dr": "druh",
+  "fr": "fruh",
+  "gr": "gruh",
+  "pr": "pruh",
+  "tr": "truh",
+  "sc": "skuh",
+  "sk": "skuh",
+  "sm": "smuh",
+  "sn": "snuh",
+  "sp": "spuh",
+  "st": "stuh",
+  "sw": "swuh",
+};
+
+function textToPhoneme(text: string): string {
+  const lower = text.toLowerCase().trim();
+  
+  if (PHONEME_MAP[lower]) {
+    return PHONEME_MAP[lower];
+  }
+  
+  return text;
+}
+
+export async function speakText(text: string, options?: { rate?: number; pitch?: number; usePhoneme?: boolean }): Promise<void> {
   try {
     if (isSpeaking) {
       await Speech.stop();
@@ -12,7 +81,9 @@ export async function speakText(text: string, options?: { rate?: number; pitch?:
 
     isSpeaking = true;
 
-    await Speech.speak(text, {
+    const textToSpeak = options?.usePhoneme !== false ? textToPhoneme(text) : text;
+
+    await Speech.speak(textToSpeak, {
       language: "en-US",
       pitch: options?.pitch || 1.0,
       rate: options?.rate || 0.85,

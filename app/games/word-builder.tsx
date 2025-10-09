@@ -35,6 +35,7 @@ export default function WordBuilderScreen() {
   const [stage, setStage] = useState<BuildStage>("initial");
   const [showFeedback, setShowFeedback] = useState<boolean>(false);
   const [playingLetterIndex, setPlayingLetterIndex] = useState<number | null>(null);
+  const [showSuccess, setShowSuccess] = useState<boolean>(false);
   const audioLoopRef = useRef<boolean>(true);
   const isCorrectAnswerGiven = useRef<boolean>(false);
   const flashAnim = useRef(new Animated.Value(0)).current;
@@ -79,7 +80,7 @@ export default function WordBuilderScreen() {
           if (!audioLoopRef.current || isCorrectAnswerGiven.current) break;
           
           setPlayingLetterIndex(i);
-          await speakText(exerciseData.letters[i]);
+          await speakText(exerciseData.letters[i], { usePhoneme: true });
           await new Promise(resolve => setTimeout(resolve, 600));
         }
         
@@ -103,14 +104,16 @@ export default function WordBuilderScreen() {
     );
   }
 
-  const handleFirstBlend = () => {
+  const handleFirstBlend = async () => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
 
     const isTwoLetterWord = exerciseData?.letters.length === 2;
+    setShowSuccess(true);
 
     if (isTwoLetterWord) {
+      await speakText(exerciseData?.word || "", { usePhoneme: false, rate: 0.7 });
       Animated.parallel([
         Animated.sequence([
           Animated.timing(letter1Scale, {
@@ -190,24 +193,31 @@ export default function WordBuilderScreen() {
           useNativeDriver: true,
           friction: 3,
         }),
-      ]).start(() => {
+      ]).start(async () => {
+        const firstBlend = exerciseData?.letters.slice(0, 2).join("") || "";
+        await speakText(firstBlend, { usePhoneme: false, rate: 0.7 });
+        
         Animated.spring(mergedScale, {
           toValue: 1,
           useNativeDriver: true,
         }).start();
         setStage("first-blend");
+        setShowSuccess(false);
       });
     }
   };
 
-  const handleFinalBlend = () => {
+  const handleFinalBlend = async () => {
     isCorrectAnswerGiven.current = true;
     audioLoopRef.current = false;
     setPlayingLetterIndex(null);
+    setShowSuccess(true);
 
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
+
+    await speakText(exerciseData?.word || "", { usePhoneme: false, rate: 0.7 });
 
     Animated.parallel([
       Animated.sequence([
@@ -292,6 +302,7 @@ export default function WordBuilderScreen() {
                 style={[
                   styles.letterTile,
                   playingLetterIndex === 0 && styles.letterTilePlaying,
+                  showSuccess && styles.letterTileSuccess,
                   { transform: [{ scale: letter1Scale }] },
                 ]}
               >
@@ -309,6 +320,7 @@ export default function WordBuilderScreen() {
                 style={[
                   styles.letterTile,
                   playingLetterIndex === 1 && styles.letterTilePlaying,
+                  showSuccess && styles.letterTileSuccess,
                   { transform: [{ scale: letter2Scale }] },
                 ]}
               >
@@ -339,6 +351,7 @@ export default function WordBuilderScreen() {
               <Animated.View
                 style={[
                   styles.mergedTile,
+                  showSuccess && styles.mergedTileSuccess,
                   { transform: [{ scale: mergedScale }] },
                 ]}
               >
@@ -352,6 +365,7 @@ export default function WordBuilderScreen() {
                 style={[
                   styles.letterTile,
                   playingLetterIndex === 2 && styles.letterTilePlaying,
+                  showSuccess && styles.letterTileSuccess,
                   { transform: [{ scale: letter3Scale }] },
                 ]}
               >
@@ -452,6 +466,26 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 12,
     elevation: 10,
+  },
+  letterTileSuccess: {
+    backgroundColor: "#4CAF50",
+    borderWidth: 4,
+    borderColor: "#FFFFFF",
+    shadowColor: "#4CAF50",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  mergedTileSuccess: {
+    backgroundColor: "#4CAF50",
+    borderWidth: 4,
+    borderColor: "#FFFFFF",
+    shadowColor: "#4CAF50",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 16,
+    elevation: 12,
   },
   audioIndicator: {
     position: "absolute",
