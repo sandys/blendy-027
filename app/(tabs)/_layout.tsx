@@ -1,10 +1,7 @@
 import { Tabs } from "expo-router";
 import { BookOpen, Volume2, Trophy } from "lucide-react-native";
 import React from "react";
-import { Platform, Dimensions } from "react-native";
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const IS_LANDSCAPE = SCREEN_WIDTH > SCREEN_HEIGHT;
+import { Platform } from "react-native";
 
 export default function TabLayout() {
   return (
@@ -18,20 +15,25 @@ export default function TabLayout() {
           borderTopWidth: 1,
           borderTopColor: "#E5E8EB",
           height: Platform.select({ 
-            ios: IS_LANDSCAPE ? 70 : 88, 
-            android: IS_LANDSCAPE ? 60 : 65, 
-            default: IS_LANDSCAPE ? 60 : 65 
+            ios: 75,
+            android: 70,
+            default: 70
           }),
-          paddingBottom: Platform.select({ ios: IS_LANDSCAPE ? 8 : 20, default: 8 }),
-          paddingTop: 8,
+          paddingBottom: Platform.select({ 
+            ios: 10,
+            android: 10,
+            default: 10
+          }),
+          paddingTop: 10,
         },
         tabBarLabelStyle: {
-          fontSize: IS_LANDSCAPE ? 13 : 12,
+          fontSize: 12,
           fontWeight: "600" as const,
-          marginTop: 4,
+          marginTop: 2,
+          marginBottom: 2,
         },
         tabBarIconStyle: {
-          marginBottom: 0,
+          marginTop: 4,
         },
       }}
     >
@@ -39,7 +41,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Lessons",
-          tabBarIcon: ({ color }) => <BookOpen color={color} size={IS_LANDSCAPE ? 26 : 24} />,
+          tabBarIcon: ({ color }) => <BookOpen color={color} size={22} />,
         }}
       />
       <Tabs.Screen
@@ -52,14 +54,14 @@ export default function TabLayout() {
         name="sound-wall"
         options={{
           title: "Sound Wall",
-          tabBarIcon: ({ color }) => <Volume2 color={color} size={IS_LANDSCAPE ? 26 : 24} />,
+          tabBarIcon: ({ color }) => <Volume2 color={color} size={22} />,
         }}
       />
       <Tabs.Screen
         name="progress"
         options={{
           title: "Progress",
-          tabBarIcon: ({ color }) => <Trophy color={color} size={IS_LANDSCAPE ? 26 : 24} />,
+          tabBarIcon: ({ color }) => <Trophy color={color} size={22} />,
         }}
       />
     </Tabs>
