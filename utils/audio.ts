@@ -92,3 +92,59 @@ export async function stopAudio(): Promise<void> {
     console.error("Error stopping audio:", error);
   }
 }
+
+function elongateSegment(segment: string, factor = 3): string {
+  return segment
+    .split("")
+    .map((ch) => ch.repeat(factor))
+    .join("");
+}
+
+const vowels = ["a", "e", "i", "o", "u"];
+
+export async function playBlending(word: string): Promise<void> {
+  try {
+    const lower = word.toLowerCase();
+    const firstVowelIndex = [...lower].findIndex((ch) => vowels.includes(ch));
+
+    if (firstVowelIndex === -1) {
+      console.warn("No vowel found in word:", word);
+      await speakText(word, { rate: 0.5 });
+      return;
+    }
+
+    const onset = lower.slice(0, firstVowelIndex);
+    const vowel = lower[firstVowelIndex];
+
+    const cvPart = elongateSegment(onset + vowel);
+    const cvcPart = elongateSegment(lower);
+
+    console.log("Blending:", { word, cvPart, cvcPart });
+
+    await new Promise<void>((resolve) => {
+      Speech.speak(cvPart, {
+        rate: 0.5,
+        pitch: 1.0,
+        language: "en-US",
+        onDone: () => resolve(),
+        onStopped: () => resolve(),
+        onError: () => resolve(),
+      });
+    });
+
+    await new Promise((r) => setTimeout(r, 150));
+
+    await new Promise<void>((resolve) => {
+      Speech.speak(cvcPart, {
+        rate: 0.5,
+        pitch: 1.0,
+        language: "en-US",
+        onDone: () => resolve(),
+        onStopped: () => resolve(),
+        onError: () => resolve(),
+      });
+    });
+  } catch (error) {
+    console.error("Error in playBlending:", error);
+  }
+}
