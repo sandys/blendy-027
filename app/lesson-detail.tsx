@@ -112,26 +112,48 @@ export default function LessonDetailScreen() {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Exercises</Text>
-            {lesson.exercises.map((exercise, index) => (
-              <TouchableOpacity
-                key={exercise.exercise_id}
-                style={styles.exerciseCard}
-                onPress={() => handleStartExercise(index)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.exerciseInfo}>
-                  <Text style={styles.exerciseType}>
-                    {exercise.exercise_type}
-                  </Text>
-                  <Text style={styles.exerciseSkill}>
-                    {exercise.skill_focus}
-                  </Text>
-                </View>
-                <View style={styles.playButton}>
-                  <Play size={24} color="#FFFFFF" fill="#FFFFFF" />
-                </View>
-              </TouchableOpacity>
-            ))}
+            {lesson.exercises.map((exercise, index) => {
+              const getExerciseContent = () => {
+                const data = exercise.data as any;
+                switch (exercise.exercise_type) {
+                  case "Rhyme Match":
+                    return `Find rhyme for: ${data.target?.word || ""}`;
+                  case "Word Tapper":
+                    return `"${data.sentence || ""}"`;
+                  case "Syllable Squish":
+                    return `Count syllables: ${data.word || ""}`;
+                  case "Sound Slide":
+                    return `Blend: ${data.onset || ""}${data.rime || ""} → ${data.word || ""}`;
+                  case "Sound Detective":
+                    return `Find ${data.targetPosition || ""} sound in: ${data.word || ""}`;
+                  case "Word Builder":
+                    return `Build: ${data.word || ""}`;
+                  default:
+                    return exercise.skill_focus;
+                }
+              };
+
+              return (
+                <TouchableOpacity
+                  key={exercise.exercise_id}
+                  style={styles.exerciseCard}
+                  onPress={() => handleStartExercise(index)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.exerciseInfo}>
+                    <Text style={styles.exerciseType}>
+                      {exercise.exercise_type}
+                    </Text>
+                    <Text style={styles.exerciseSkill}>
+                      {getExerciseContent()}
+                    </Text>
+                  </View>
+                  <View style={styles.playButton}>
+                    <Play size={24} color="#FFFFFF" fill="#FFFFFF" />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {lesson.story && (
