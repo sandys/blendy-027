@@ -1,10 +1,12 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { CheckCircle, Circle } from "lucide-react-native";
 import { useApp } from "@/contexts/AppContext";
 import { PHASES } from "@/constants/curriculum-data";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export default function LessonsScreen() {
   const router = useRouter();
@@ -13,7 +15,7 @@ export default function LessonsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <Text style={styles.title}>All Lessons</Text>
         <Text style={styles.subtitle}>
           {progress.completedLessons.length} of {lessons.length} completed
@@ -22,7 +24,7 @@ export default function LessonsScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
         showsVerticalScrollIndicator={false}
       >
         {PHASES.map((phase) => {
@@ -62,10 +64,20 @@ export default function LessonsScreen() {
                       }}
                       activeOpacity={0.7}
                     >
-                      <View style={styles.lessonNumber}>
-                        <Text style={styles.lessonNumberText}>
-                          {lesson.lesson_number}
-                        </Text>
+                      <View style={styles.lessonHeader}>
+                        <View style={styles.lessonNumber}>
+                          <Text style={styles.lessonNumberText}>
+                            {lesson.lesson_number}
+                          </Text>
+                        </View>
+                        <View style={styles.lessonStatus}>
+                          {!isCompleted && (
+                            <Circle size={24} color={phase.color} />
+                          )}
+                          {isCompleted && (
+                            <CheckCircle size={24} color={phase.color} fill={phase.color} />
+                          )}
+                        </View>
                       </View>
 
                       <View style={styles.lessonContent}>
@@ -82,15 +94,6 @@ export default function LessonsScreen() {
                           {lesson.description}
                         </Text>
                       </View>
-
-                      <View style={styles.lessonStatus}>
-                        {!isCompleted && (
-                          <Circle size={20} color={phase.color} />
-                        )}
-                        {isCompleted && (
-                          <CheckCircle size={20} color={phase.color} fill={phase.color} />
-                        )}
-                      </View>
                     </TouchableOpacity>
                   );
                 })}
@@ -103,23 +106,28 @@ export default function LessonsScreen() {
   );
 }
 
+const CARD_WIDTH = Math.min((SCREEN_WIDTH - 64) / 3, 280);
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F8F9FA",
   },
   header: {
-    padding: 20,
+    paddingHorizontal: 24,
     paddingBottom: 16,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "800" as const,
     color: "#1A1A1A",
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     color: "#666",
     fontWeight: "500" as const,
   },
@@ -127,9 +135,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
-    paddingTop: 0,
-    paddingBottom: 40,
+    padding: 24,
+    paddingTop: 20,
   },
   phaseSection: {
     marginBottom: 32,
@@ -159,15 +166,15 @@ const styles = StyleSheet.create({
     color: "#666",
   },
   lessonsGrid: {
-    gap: 12,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
   },
   lessonCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
+    width: CARD_WIDTH,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -175,10 +182,15 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   lessonCardCurrent: {
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: "#4ECDC4",
   },
-
+  lessonHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
   lessonNumber: {
     width: 48,
     height: 48,
@@ -192,7 +204,6 @@ const styles = StyleSheet.create({
     fontWeight: "800" as const,
     color: "#1A1A1A",
   },
-
   lessonContent: {
     flex: 1,
   },
@@ -200,17 +211,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700" as const,
     color: "#1A1A1A",
-    marginBottom: 4,
+    marginBottom: 6,
   },
-
   lessonDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#666",
+    lineHeight: 18,
   },
-
   lessonStatus: {
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
     alignItems: "center",
     justifyContent: "center",
   },

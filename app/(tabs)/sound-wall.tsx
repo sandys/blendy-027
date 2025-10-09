@@ -13,8 +13,8 @@ import { X, Lock, Volume2 } from "lucide-react-native";
 import { useApp } from "@/contexts/AppContext";
 import { PhonemeCard } from "@/types/curriculum";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const CARD_SIZE = (SCREEN_WIDTH - 64) / 4;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const CARD_SIZE = Math.min((SCREEN_WIDTH - 80) / 8, 100);
 
 export default function SoundWallScreen() {
   const { phonemeCards } = useApp();
@@ -108,7 +108,7 @@ export default function SoundWallScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.title}>Sound Wall</Text>
         <Text style={styles.subtitle}>
           All 44 phonemes organized by articulation
@@ -117,7 +117,7 @@ export default function SoundWallScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
         showsVerticalScrollIndicator={true}
       >
         <View style={styles.mainSection}>
@@ -249,20 +249,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8F9FA",
   },
   header: {
-    padding: 20,
-    paddingBottom: 16,
+    paddingHorizontal: 24,
+    paddingBottom: 12,
     backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
   },
   title: {
-    fontSize: 32,
+    fontSize: 26,
     fontWeight: "800" as const,
     color: "#1A1A1A",
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#666",
     fontWeight: "500" as const,
   },
@@ -270,43 +270,43 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
+    padding: 20,
+    paddingTop: 16,
   },
   mainSection: {
-    marginBottom: 32,
+    marginBottom: 28,
   },
   sectionTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "800" as const,
     color: "#1A1A1A",
     marginBottom: 4,
   },
   sectionSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: "#666",
-    marginBottom: 20,
+    marginBottom: 16,
     fontWeight: "500" as const,
   },
   categorySection: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   categoryHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginBottom: 10,
   },
   categoryTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700" as const,
     color: "#1A1A1A",
   },
   categoryCount: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600" as const,
     color: "#666",
   },
@@ -319,8 +319,8 @@ const styles = StyleSheet.create({
     width: CARD_SIZE,
     aspectRatio: 1,
     backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 8,
+    borderRadius: 10,
+    padding: 6,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -338,24 +338,24 @@ const styles = StyleSheet.create({
   },
   lockOverlay: {
     position: "absolute",
-    top: 6,
-    right: 6,
+    top: 4,
+    right: 4,
   },
   soundEmoji: {
-    fontSize: 28,
-    marginBottom: 4,
+    fontSize: 22,
+    marginBottom: 3,
   },
   soundPhoneme: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "800" as const,
     color: "#1A1A1A",
-    marginBottom: 2,
+    marginBottom: 1,
   },
   soundPhonemeLocked: {
     color: "#CCC",
   },
   soundWord: {
-    fontSize: 10,
+    fontSize: 9,
     color: "#666",
     fontWeight: "600" as const,
     textAlign: "center" as const,

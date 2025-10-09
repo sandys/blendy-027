@@ -13,17 +13,15 @@ export default function TabLayout() {
           backgroundColor: "#FFFFFF",
           borderTopWidth: 1,
           borderTopColor: "#F0F0F0",
-          height: Platform.select({ ios: 85, android: 70, default: 70 }),
-          paddingBottom: Platform.select({ ios: 25, android: 10, default: 10 }),
-          paddingTop: 10,
+          height: Platform.select({ ios: 88, android: 65, default: 65 }),
         },
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "600" as const,
-          marginBottom: Platform.select({ ios: 0, android: 5, default: 5 }),
+          marginTop: 2,
         },
         tabBarIconStyle: {
-          marginTop: Platform.select({ ios: 5, android: 0, default: 0 }),
+          marginBottom: 0,
         },
       }}
     >
