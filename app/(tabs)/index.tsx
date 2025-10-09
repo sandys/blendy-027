@@ -6,7 +6,8 @@ import { CheckCircle, Circle } from "lucide-react-native";
 import { useApp } from "@/contexts/AppContext";
 import { PHASES } from "@/constants/curriculum-data";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const IS_LANDSCAPE = SCREEN_WIDTH > SCREEN_HEIGHT;
 
 export default function LessonsScreen() {
   const router = useRouter();
@@ -106,121 +107,132 @@ export default function LessonsScreen() {
   );
 }
 
-const CARD_WIDTH = Math.min((SCREEN_WIDTH - 64) / 3, 280);
+const CARD_WIDTH = IS_LANDSCAPE 
+  ? Math.min((SCREEN_WIDTH - 80) / 4, 240)
+  : Math.min((SCREEN_WIDTH - 64) / 2, 280);
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "#F5F7FA",
   },
   header: {
-    paddingHorizontal: 24,
-    paddingBottom: 16,
+    paddingHorizontal: 32,
+    paddingBottom: 20,
     backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    borderBottomColor: "#E5E8EB",
   },
   title: {
-    fontSize: 28,
+    fontSize: 34,
     fontWeight: "800" as const,
-    color: "#1A1A1A",
-    marginBottom: 4,
+    color: "#1A1A2E",
+    marginBottom: 6,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 15,
-    color: "#666",
+    fontSize: 16,
+    color: "#6B7280",
     fontWeight: "500" as const,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 24,
-    paddingTop: 20,
+    padding: 32,
+    paddingTop: 24,
   },
   phaseSection: {
-    marginBottom: 32,
+    marginBottom: 40,
   },
   phaseHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
-    gap: 12,
+    marginBottom: 20,
+    gap: 16,
   },
   phaseDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
   },
   phaseHeaderText: {
     flex: 1,
   },
   phaseTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: "700" as const,
-    color: "#1A1A1A",
-    marginBottom: 2,
+    color: "#1A1A2E",
+    marginBottom: 4,
+    letterSpacing: -0.3,
   },
   phaseDescription: {
-    fontSize: 14,
-    color: "#666",
+    fontSize: 15,
+    color: "#6B7280",
+    lineHeight: 22,
   },
   lessonsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 16,
+    gap: 20,
   },
   lessonCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 20,
     width: CARD_WIDTH,
+    minHeight: 160,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 2,
+    borderColor: "transparent",
   },
   lessonCardCurrent: {
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: "#4ECDC4",
+    shadowColor: "#4ECDC4",
+    shadowOpacity: 0.15,
   },
   lessonHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 16,
   },
   lessonNumber: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#F0F0F0",
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#F3F4F6",
     alignItems: "center",
     justifyContent: "center",
   },
   lessonNumberText: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: "800" as const,
-    color: "#1A1A1A",
+    color: "#1A1A2E",
   },
   lessonContent: {
     flex: 1,
   },
   lessonTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700" as const,
-    color: "#1A1A1A",
-    marginBottom: 6,
+    color: "#1A1A2E",
+    marginBottom: 8,
+    lineHeight: 24,
   },
   lessonDescription: {
-    fontSize: 13,
-    color: "#666",
-    lineHeight: 18,
+    fontSize: 14,
+    color: "#6B7280",
+    lineHeight: 20,
   },
   lessonStatus: {
-    width: 28,
-    height: 28,
+    width: 32,
+    height: 32,
     alignItems: "center",
     justifyContent: "center",
   },

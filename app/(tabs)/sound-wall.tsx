@@ -14,7 +14,10 @@ import { useApp } from "@/contexts/AppContext";
 import { PhonemeCard } from "@/types/curriculum";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const CARD_SIZE = Math.min((SCREEN_WIDTH - 80) / 8, 100);
+const IS_LANDSCAPE = SCREEN_WIDTH > SCREEN_HEIGHT;
+const CARD_SIZE = IS_LANDSCAPE 
+  ? Math.min((SCREEN_WIDTH - 100) / 10, 90)
+  : Math.min((SCREEN_WIDTH - 80) / 6, 100);
 
 export default function SoundWallScreen() {
   const { phonemeCards } = useApp();
@@ -246,88 +249,91 @@ export default function SoundWallScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "#F5F7FA",
   },
   header: {
-    paddingHorizontal: 24,
-    paddingBottom: 12,
+    paddingHorizontal: 32,
+    paddingBottom: 20,
     backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    borderBottomColor: "#E5E8EB",
   },
   title: {
-    fontSize: 26,
+    fontSize: 34,
     fontWeight: "800" as const,
-    color: "#1A1A1A",
-    marginBottom: 4,
+    color: "#1A1A2E",
+    marginBottom: 6,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 13,
-    color: "#666",
+    fontSize: 16,
+    color: "#6B7280",
     fontWeight: "500" as const,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
-    paddingTop: 16,
+    padding: 32,
+    paddingTop: 24,
   },
   mainSection: {
-    marginBottom: 28,
+    marginBottom: 40,
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: "800" as const,
-    color: "#1A1A1A",
-    marginBottom: 4,
+    color: "#1A1A2E",
+    marginBottom: 6,
+    letterSpacing: -0.5,
   },
   sectionSubtitle: {
-    fontSize: 12,
-    color: "#666",
-    marginBottom: 16,
+    fontSize: 15,
+    color: "#6B7280",
+    marginBottom: 20,
     fontWeight: "500" as const,
+    lineHeight: 22,
   },
   categorySection: {
-    marginBottom: 20,
+    marginBottom: 28,
   },
   categoryHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    marginBottom: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 14,
+    marginBottom: 16,
   },
   categoryTitle: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: "700" as const,
-    color: "#1A1A1A",
+    color: "#1A1A2E",
   },
   categoryCount: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "600" as const,
-    color: "#666",
+    color: "#6B7280",
   },
   cardsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: 12,
   },
   soundCard: {
     width: CARD_SIZE,
     aspectRatio: 1,
     backgroundColor: "#FFFFFF",
-    borderRadius: 10,
-    padding: 6,
+    borderRadius: 14,
+    padding: 8,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 3,
     position: "relative",
   },
   soundCardVowel: {
@@ -342,21 +348,21 @@ const styles = StyleSheet.create({
     right: 4,
   },
   soundEmoji: {
-    fontSize: 22,
-    marginBottom: 3,
+    fontSize: 28,
+    marginBottom: 4,
   },
   soundPhoneme: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "800" as const,
-    color: "#1A1A1A",
-    marginBottom: 1,
+    color: "#1A1A2E",
+    marginBottom: 2,
   },
   soundPhonemeLocked: {
     color: "#CCC",
   },
   soundWord: {
-    fontSize: 9,
-    color: "#666",
+    fontSize: 11,
+    color: "#6B7280",
     fontWeight: "600" as const,
     textAlign: "center" as const,
   },
