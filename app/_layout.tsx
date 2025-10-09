@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as ScreenOrientation from "expo-screen-orientation";
 import React, { useEffect } from "react";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AppProvider } from "@/contexts/AppContext";
 
@@ -29,7 +30,13 @@ function RootLayoutNav() {
 export default function RootLayout() {
   useEffect(() => {
     const lockOrientation = async () => {
-      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT);
+      if (Platform.OS !== 'web') {
+        try {
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT);
+        } catch (error) {
+          console.log('Orientation lock not available:', error);
+        }
+      }
     };
     lockOrientation();
     SplashScreen.hideAsync();
