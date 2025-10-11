@@ -208,10 +208,11 @@ export default function SoundSlideScreen() {
   const headerHeight = isLandscape ? 80 : 100;
   const gameAreaHeight = availableHeight - headerHeight;
   const tileSize = isLandscape 
-    ? Math.min(width * 0.08, gameAreaHeight * 0.4, 100)
-    : Math.min(width * 0.18, gameAreaHeight * 0.25, 120);
-  const onsetLeft = isLandscape ? width * 0.15 : width * 0.15;
-  const rimeLeft = isLandscape ? width * 0.75 : width * 0.7;
+    ? Math.min(width * 0.12, gameAreaHeight * 0.35, 100)
+    : Math.min(width * 0.22, gameAreaHeight * 0.2, 140);
+  const onsetLeft = isLandscape ? width * 0.2 : width * 0.15;
+  const rimeLeft = isLandscape ? width * 0.65 : width * 0.65;
+  const tileTop = headerHeight + (gameAreaHeight / 2) - (tileSize / 2);
 
   return (
     <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -240,6 +241,7 @@ export default function SoundSlideScreen() {
                 isPlayingOnset && styles.tilePlaying,
                 showSuccess && styles.tileSuccess,
                 {
+                  top: tileTop,
                   left: onsetLeft,
                   width: tileSize,
                   height: tileSize,
@@ -267,6 +269,7 @@ export default function SoundSlideScreen() {
                 isPlayingRime && styles.tilePlaying,
                 showSuccess && styles.tileSuccess,
                 {
+                  top: tileTop,
                   left: rimeLeft,
                   width: tileSize,
                   height: tileSize,
@@ -283,8 +286,8 @@ export default function SoundSlideScreen() {
               )}
             </Animated.View>
 
-            <View style={[styles.guideContainer, { top: -tileSize - (isLandscape ? 40 : 50), left: onsetLeft }]}>
-              <Text style={[styles.guideText, { fontSize: isLandscape ? 14 : 20 }]}>👆 Drag me →</Text>
+            <View style={[styles.guideContainer, { top: tileTop - (isLandscape ? 40 : 50), left: onsetLeft }]}>
+              <Text style={[styles.guideText, { fontSize: isLandscape ? 14 : 18 }]}>👆 Drag me →</Text>
             </View>
           </>
         )}
@@ -345,8 +348,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-    top: "50%",
-    marginTop: -60,
   },
   rimeTile: {
     position: "absolute",
@@ -358,8 +359,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-    top: "50%",
-    marginTop: -60,
   },
   tilePlaying: {
     borderWidth: 4,
