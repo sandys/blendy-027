@@ -205,12 +205,14 @@ export default function SoundSlideScreen() {
 
   const isLandscape = width > height;
   const availableHeight = height - insets.top - insets.bottom;
-  const headerHeight = 100;
+  const headerHeight = isLandscape ? 80 : 100;
   const gameAreaHeight = availableHeight - headerHeight;
-  const tileSize = Math.min(width * 0.12, gameAreaHeight * 0.3, 120);
+  const tileSize = isLandscape 
+    ? Math.min(width * 0.08, gameAreaHeight * 0.4, 100)
+    : Math.min(width * 0.18, gameAreaHeight * 0.25, 120);
   const verticalCenter = headerHeight + (gameAreaHeight * 0.5);
-  const onsetLeft = width * 0.15;
-  const rimeRight = width * 0.15;
+  const onsetLeft = isLandscape ? width * 0.2 : width * 0.15;
+  const rimeRight = isLandscape ? width * 0.2 : width * 0.15;
 
   return (
     <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -221,11 +223,11 @@ export default function SoundSlideScreen() {
         ]} 
         pointerEvents="none"
       />
-      <View style={[styles.header, { height: headerHeight }]}>
-        <Text style={styles.progressText}>
+      <View style={[styles.header, { height: headerHeight, paddingHorizontal: 20 }]}>
+        <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 16 }]}>
           Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
         </Text>
-        <Text style={styles.instructionText}>
+        <Text style={[styles.instructionText, { fontSize: isLandscape ? 18 : 24 }]}>
           Drag the sounds together to make a word!
         </Text>
       </View>
@@ -243,6 +245,7 @@ export default function SoundSlideScreen() {
                   top: verticalCenter - tileSize / 2,
                   width: tileSize,
                   height: tileSize,
+                  borderRadius: tileSize * 0.2,
                   transform: [
                     { translateX: onsetPosition.x },
                     { translateY: onsetPosition.y },
@@ -252,10 +255,10 @@ export default function SoundSlideScreen() {
               ]}
               {...panResponder.panHandlers}
             >
-              <Text style={styles.tileText}>{exerciseData?.onset}</Text>
+              <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.onset}</Text>
               {isPlayingOnset && (
                 <View style={styles.audioIndicator}>
-                  <Volume2 size={20} color="#FFFFFF" />
+                  <Volume2 size={tileSize * 0.2} color="#FFFFFF" />
                 </View>
               )}
             </Animated.View>
@@ -270,38 +273,39 @@ export default function SoundSlideScreen() {
                   top: verticalCenter - tileSize / 2,
                   width: tileSize,
                   height: tileSize,
+                  borderRadius: tileSize * 0.2,
                   transform: [{ scale: rimeScale }],
                 },
               ]}
             >
-              <Text style={styles.tileText}>{exerciseData?.rime}</Text>
+              <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.rime}</Text>
               {isPlayingRime && (
                 <View style={styles.audioIndicator}>
-                  <Volume2 size={20} color="#FFFFFF" />
+                  <Volume2 size={tileSize * 0.2} color="#FFFFFF" />
                 </View>
               )}
             </Animated.View>
 
-            <View style={[styles.guideContainer, { top: verticalCenter - tileSize / 2 - 50, left: onsetLeft }]}>
-              <Text style={styles.guideText}>👆 Drag me →</Text>
+            <View style={[styles.guideContainer, { top: verticalCenter - tileSize / 2 - (isLandscape ? 40 : 50), left: onsetLeft }]}>
+              <Text style={[styles.guideText, { fontSize: isLandscape ? 14 : 20 }]}>👆 Drag me →</Text>
             </View>
           </>
         )}
 
         {stage === "merged" && (
           <View style={styles.mergedContainer}>
-            <View style={styles.wordCard}>
-              <Text style={styles.wordEmoji}>{exerciseData?.image}</Text>
-              <Text style={styles.wordText}>{exerciseData?.word}</Text>
+            <View style={[styles.wordCard, { padding: isLandscape ? 30 : 40 }]}>
+              <Text style={[styles.wordEmoji, { fontSize: isLandscape ? 70 : 100 }]}>{exerciseData?.image}</Text>
+              <Text style={[styles.wordText, { fontSize: isLandscape ? 40 : 56 }]}>{exerciseData?.word}</Text>
             </View>
           </View>
         )}
       </View>
 
       {showFeedback && (
-        <View style={styles.feedbackContainer}>
-          <Text style={styles.feedbackEmoji}>🎉</Text>
-          <Text style={styles.feedbackText}>Great job!</Text>
+        <View style={[styles.feedbackContainer, { bottom: isLandscape ? 40 : 80 }]}>
+          <Text style={[styles.feedbackEmoji, { fontSize: isLandscape ? 50 : 72 }]}>🎉</Text>
+          <Text style={[styles.feedbackText, { fontSize: isLandscape ? 24 : 32 }]}>Great job!</Text>
         </View>
       )}
     </View>
@@ -320,14 +324,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   instructionText: {
-    fontSize: 24,
     fontWeight: "700" as const,
     color: "#FFD93D",
     textAlign: "center",
     marginBottom: 8,
   },
   progressText: {
-    fontSize: 16,
     color: "#999",
     fontWeight: "600" as const,
   },
@@ -339,7 +341,6 @@ const styles = StyleSheet.create({
   },
   onsetTile: {
     position: "absolute",
-    borderRadius: 20,
     backgroundColor: "#FF6B9D",
     justifyContent: "center",
     alignItems: "center",
@@ -351,7 +352,6 @@ const styles = StyleSheet.create({
   },
   rimeTile: {
     position: "absolute",
-    borderRadius: 20,
     backgroundColor: "#4ECDC4",
     justifyContent: "center",
     alignItems: "center",
@@ -389,7 +389,6 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   tileText: {
-    fontSize: 42,
     fontWeight: "800" as const,
     color: "#FFFFFF",
   },
@@ -397,7 +396,6 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   guideText: {
-    fontSize: 20,
     fontWeight: "600" as const,
     color: "#666",
   },
@@ -408,7 +406,6 @@ const styles = StyleSheet.create({
   wordCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 30,
-    padding: 40,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
@@ -417,17 +414,14 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   wordEmoji: {
-    fontSize: 100,
     marginBottom: 20,
   },
   wordText: {
-    fontSize: 56,
     fontWeight: "800" as const,
     color: "#1A1A1A",
   },
   feedbackContainer: {
     position: "absolute",
-    bottom: 80,
     alignSelf: "center",
     backgroundColor: "#E8F5E9",
     padding: 20,
@@ -436,11 +430,9 @@ const styles = StyleSheet.create({
     minWidth: 200,
   },
   feedbackEmoji: {
-    fontSize: 72,
     marginBottom: 12,
   },
   feedbackText: {
-    fontSize: 32,
     fontWeight: "700" as const,
     textAlign: "center",
     color: "#333",

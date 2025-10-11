@@ -81,7 +81,7 @@ export async function speakText(text: string, options?: { rate?: number; pitch?:
 
     isSpeaking = true;
 
-    const textToSpeak = options?.usePhoneme !== false ? textToPhoneme(text) : text;
+    const textToSpeak = options?.usePhoneme === true ? textToPhoneme(text) : text;
 
     await Speech.speak(textToSpeak, {
       language: "en-US",

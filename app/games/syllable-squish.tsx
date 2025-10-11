@@ -179,6 +179,8 @@ export default function SyllableSquishScreen() {
 
   const isLandscape = width > height;
   const availableHeight = height - insets.top - insets.bottom;
+  const buttonSize = isLandscape ? Math.min(width * 0.15, 140) : 180;
+  const progressSize = isLandscape ? 40 : 50;
 
   return (
     <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -192,10 +194,10 @@ export default function SyllableSquishScreen() {
       <View style={[styles.landscapeContent, { minHeight: availableHeight }]}>
         <View style={styles.leftSection}>
           <View style={styles.header}>
-            <Text style={styles.progressText}>
+            <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 14 }]}>
               Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
             </Text>
-            <Text style={styles.instructionText}>
+            <Text style={[styles.instructionText, { fontSize: isLandscape ? 18 : 26 }]}>
               Tap the button for each syllable
             </Text>
           </View>
@@ -205,8 +207,8 @@ export default function SyllableSquishScreen() {
               styles.wordCard,
               isPlayingWord && styles.wordCardPlaying
             ]}>
-              <Text style={styles.wordEmoji}>{image}</Text>
-              <Text style={styles.wordText}>{word}</Text>
+              <Text style={[styles.wordEmoji, { fontSize: isLandscape ? 60 : 80 }]}>{image}</Text>
+              <Text style={[styles.wordText, { fontSize: isLandscape ? 28 : 36 }]}>{word}</Text>
               {isPlayingWord && (
                 <View style={styles.audioIndicator}>
                   <Volume2 size={28} color="#FFB84D" />
@@ -217,7 +219,7 @@ export default function SyllableSquishScreen() {
         </View>
 
         <View style={styles.rightSection}>
-          <View style={styles.progressBarContainer}>
+          <View style={[styles.progressBarContainer, { marginBottom: isLandscape ? 20 : 30 }]}>
         {Array.from({ length: syllableCount }).map((_, index) => {
           const scale = progressAnims[index]
             ? progressAnims[index].interpolate({
@@ -239,6 +241,9 @@ export default function SyllableSquishScreen() {
               style={[
                 styles.progressSegment,
                 {
+                  width: progressSize,
+                  height: progressSize,
+                  borderRadius: progressSize / 2,
                   transform: [{ scale }],
                   opacity,
                 },
@@ -258,18 +263,22 @@ export default function SyllableSquishScreen() {
             style={[
               styles.squishButton,
               {
+                width: buttonSize,
+                height: buttonSize,
+                borderRadius: buttonSize / 2,
+                borderWidth: isLandscape ? 6 : 8,
                 transform: [{ scale: buttonScale }],
               },
             ]}
           >
-            <Text style={styles.squishButtonText}>SQUISH!</Text>
-            <Text style={styles.squishButtonEmoji}>👆</Text>
+            <Text style={[styles.squishButtonText, { fontSize: isLandscape ? 24 : 32 }]}>SQUISH!</Text>
+            <Text style={[styles.squishButtonEmoji, { fontSize: isLandscape ? 36 : 48 }]}>👆</Text>
           </Animated.View>
         </TouchableOpacity>
           </View>
 
           <View style={styles.counterContainer}>
-            <Text style={styles.counterText}>
+            <Text style={[styles.counterText, { fontSize: isLandscape ? 18 : 22 }]}>
               Taps: {tapCount} / {syllableCount}
             </Text>
           </View>
@@ -281,10 +290,10 @@ export default function SyllableSquishScreen() {
                 isCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect,
               ]}
             >
-              <Text style={styles.feedbackEmoji}>
+              <Text style={[styles.feedbackEmoji, { fontSize: isLandscape ? 50 : 72 }]}>
                 {isCorrect ? "🎉" : "🤔"}
               </Text>
-              <Text style={styles.feedbackText}>
+              <Text style={[styles.feedbackText, { fontSize: isLandscape ? 24 : 32 }]}>
                 {isCorrect ? "Perfect!" : "Oops! Try again!"}
               </Text>
             </View>
@@ -316,18 +325,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   header: {
-    marginBottom: 30,
+    marginBottom: 20,
     alignItems: "center",
   },
   instructionText: {
-    fontSize: 26,
     fontWeight: "700" as const,
     color: "#FFB84D",
     textAlign: "center",
     marginBottom: 8,
   },
   progressText: {
-    fontSize: 14,
     color: "#999",
     fontWeight: "600" as const,
     marginBottom: 12,
@@ -370,11 +377,9 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   wordEmoji: {
-    fontSize: 80,
     marginBottom: 10,
   },
   wordText: {
-    fontSize: 36,
     fontWeight: "700" as const,
     color: "#333",
   },
@@ -382,23 +387,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     gap: 12,
-    marginBottom: 30,
     paddingHorizontal: 20,
   },
   progressSegment: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
     backgroundColor: "#FFB84D",
   },
   buttonContainer: {
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 20,
   },
   squishButton: {
-    width: 180,
-    height: 180,
-    borderRadius: 90,
     backgroundColor: "#FFB84D",
     justifyContent: "center",
     alignItems: "center",
@@ -407,23 +405,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
-    borderWidth: 8,
     borderColor: "#FFA726",
   },
   squishButtonText: {
-    fontSize: 32,
     fontWeight: "900" as const,
     color: "#FFFFFF",
     marginBottom: 8,
   },
   squishButtonEmoji: {
-    fontSize: 48,
   },
   counterContainer: {
     alignItems: "center",
   },
   counterText: {
-    fontSize: 22,
     fontWeight: "700" as const,
     color: "#666",
   },
@@ -441,11 +435,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFEBEE",
   },
   feedbackEmoji: {
-    fontSize: 72,
     marginBottom: 12,
   },
   feedbackText: {
-    fontSize: 32,
     fontWeight: "700" as const,
     textAlign: "center",
     color: "#333",

@@ -209,6 +209,8 @@ export default function WordBuilderScreen() {
       if (inDropZone.length > 0) {
         const partialBlend = inDropZone.map((l) => l.letter).join("");
         setBlendedText(partialBlend);
+        audioLoopRef.current = false;
+        setPlayingLetterIndex(null);
         await speakText(partialBlend, { usePhoneme: false, rate: 0.7 });
       }
       return;
@@ -312,8 +314,8 @@ export default function WordBuilderScreen() {
               >
                 {blendedText ? (
                   <View style={styles.blendedContainer}>
-                    <Text style={[styles.blendedText, { fontSize: tileSize * 0.5 }]}>{blendedText}</Text>
-                    {showSuccess && <CheckCircle size={tileSize * 0.4} color="#4CAF50" />}
+                    <Text style={[styles.blendedText, { fontSize: tileSize * 0.5, color: showSuccess ? "#4CAF50" : "#2196F3" }]}>{blendedText}</Text>
+                    {showSuccess && <CheckCircle size={tileSize * 0.4} color="#4CAF50" fill="#4CAF50" />}
                   </View>
                 ) : (
                   <Text style={[styles.dropZoneText, { fontSize: isLandscape ? 16 : 18 }]}>Drop letters here</Text>
