@@ -257,8 +257,8 @@ export default function SoundSlideScreen() {
             >
               <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.onset}</Text>
               {isPlayingOnset && (
-                <View style={styles.audioIndicator}>
-                  <Volume2 size={tileSize * 0.2} color="#FFFFFF" />
+                <View style={[styles.audioIndicator, { padding: Math.max(4, tileSize * 0.08) }]}>
+                  <Volume2 size={Math.max(16, tileSize * 0.25)} color="#FFFFFF" />
                 </View>
               )}
             </Animated.View>
@@ -280,8 +280,8 @@ export default function SoundSlideScreen() {
             >
               <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.rime}</Text>
               {isPlayingRime && (
-                <View style={styles.audioIndicator}>
-                  <Volume2 size={tileSize * 0.2} color="#FFFFFF" />
+                <View style={[styles.audioIndicator, { padding: Math.max(4, tileSize * 0.08) }]}>
+                  <Volume2 size={Math.max(16, tileSize * 0.25)} color="#FFFFFF" />
                 </View>
               )}
             </Animated.View>
@@ -382,11 +382,10 @@ const styles = StyleSheet.create({
   },
   audioIndicator: {
     position: "absolute",
-    top: 8,
-    right: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
-    borderRadius: 16,
-    padding: 6,
+    top: 4,
+    right: 4,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    borderRadius: 20,
   },
   tileText: {
     fontWeight: "800" as const,
