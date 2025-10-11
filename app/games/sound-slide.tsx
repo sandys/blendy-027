@@ -210,9 +210,8 @@ export default function SoundSlideScreen() {
   const tileSize = isLandscape 
     ? Math.min(width * 0.08, gameAreaHeight * 0.4, 100)
     : Math.min(width * 0.18, gameAreaHeight * 0.25, 120);
-  const verticalCenter = headerHeight + (gameAreaHeight * 0.5);
-  const onsetLeft = isLandscape ? width * 0.2 : width * 0.15;
-  const rimeRight = isLandscape ? width * 0.2 : width * 0.15;
+  const onsetLeft = isLandscape ? width * 0.15 : width * 0.15;
+  const rimeLeft = isLandscape ? width * 0.75 : width * 0.7;
 
   return (
     <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -232,7 +231,7 @@ export default function SoundSlideScreen() {
         </Text>
       </View>
 
-      <View style={[styles.gameArea, { height: gameAreaHeight }]}>
+      <View style={styles.gameArea}>
         {stage === "initial" && (
           <>
             <Animated.View
@@ -242,7 +241,6 @@ export default function SoundSlideScreen() {
                 showSuccess && styles.tileSuccess,
                 {
                   left: onsetLeft,
-                  top: verticalCenter - tileSize / 2,
                   width: tileSize,
                   height: tileSize,
                   borderRadius: tileSize * 0.2,
@@ -269,8 +267,7 @@ export default function SoundSlideScreen() {
                 isPlayingRime && styles.tilePlaying,
                 showSuccess && styles.tileSuccess,
                 {
-                  right: rimeRight,
-                  top: verticalCenter - tileSize / 2,
+                  left: rimeLeft,
                   width: tileSize,
                   height: tileSize,
                   borderRadius: tileSize * 0.2,
@@ -286,7 +283,7 @@ export default function SoundSlideScreen() {
               )}
             </Animated.View>
 
-            <View style={[styles.guideContainer, { top: Math.max(headerHeight + 10, verticalCenter - tileSize / 2 - (isLandscape ? 35 : 50)), left: onsetLeft }]}>
+            <View style={[styles.guideContainer, { top: -tileSize - (isLandscape ? 40 : 50), left: onsetLeft }]}>
               <Text style={[styles.guideText, { fontSize: isLandscape ? 14 : 20 }]}>👆 Drag me →</Text>
             </View>
           </>
@@ -337,7 +334,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    position: "relative",
   },
   onsetTile: {
     position: "absolute",
@@ -349,6 +345,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    top: "50%",
+    marginTop: -60,
   },
   rimeTile: {
     position: "absolute",
@@ -360,6 +358,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    top: "50%",
+    marginTop: -60,
   },
   tilePlaying: {
     borderWidth: 4,
