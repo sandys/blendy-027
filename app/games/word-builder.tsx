@@ -277,8 +277,12 @@ export default function WordBuilderScreen() {
     outputRange: ['rgba(33, 150, 243, 0)', 'rgba(33, 150, 243, 0.3)'],
   });
 
+  const availableHeight = height - insets.top - insets.bottom;
+  const headerHeight = 100;
+  const buildAreaHeight = availableHeight - headerHeight;
+
   return (
-    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>
+    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <Animated.View 
         style={[
           styles.flashOverlay,
@@ -286,14 +290,14 @@ export default function WordBuilderScreen() {
         ]} 
         pointerEvents="none"
       />
-      <View style={styles.header}>
+      <View style={[styles.header, { height: headerHeight }]}>
         <Text style={styles.progressText}>
           Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
         </Text>
         <Text style={styles.instructionText}>{getInstructionText()}</Text>
       </View>
 
-      <View style={styles.buildArea}>
+      <View style={[styles.buildArea, { height: buildAreaHeight }]}>
         {stage === "initial" && (
           <>
             <View style={styles.lettersRow}>
@@ -435,7 +439,6 @@ const styles = StyleSheet.create({
     fontWeight: "600" as const,
   },
   buildArea: {
-    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },

@@ -204,13 +204,16 @@ export default function SoundSlideScreen() {
   });
 
   const isLandscape = width > height;
-  const tileSize = Math.min(width * 0.12, height * 0.25, 120);
-  const verticalCenter = height * 0.5;
+  const availableHeight = height - insets.top - insets.bottom;
+  const headerHeight = 100;
+  const gameAreaHeight = availableHeight - headerHeight;
+  const tileSize = Math.min(width * 0.12, gameAreaHeight * 0.3, 120);
+  const verticalCenter = headerHeight + (gameAreaHeight * 0.5);
   const onsetLeft = width * 0.15;
   const rimeRight = width * 0.15;
 
   return (
-    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>
+    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <Animated.View 
         style={[
           styles.flashOverlay,
@@ -218,7 +221,7 @@ export default function SoundSlideScreen() {
         ]} 
         pointerEvents="none"
       />
-      <View style={styles.header}>
+      <View style={[styles.header, { height: headerHeight }]}>
         <Text style={styles.progressText}>
           Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
         </Text>
@@ -227,7 +230,7 @@ export default function SoundSlideScreen() {
         </Text>
       </View>
 
-      <View style={styles.gameArea}>
+      <View style={[styles.gameArea, { height: gameAreaHeight }]}>
         {stage === "initial" && (
           <>
             <Animated.View

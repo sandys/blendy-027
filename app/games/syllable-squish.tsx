@@ -177,8 +177,11 @@ export default function SyllableSquishScreen() {
     outputRange: ['rgba(255, 184, 77, 0)', 'rgba(255, 184, 77, 0.3)'],
   });
 
+  const isLandscape = width > height;
+  const availableHeight = height - insets.top - insets.bottom;
+
   return (
-    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>
+    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <Animated.View 
         style={[
           styles.flashOverlay,
@@ -186,7 +189,7 @@ export default function SyllableSquishScreen() {
         ]} 
         pointerEvents="none"
       />
-      <View style={styles.landscapeContent}>
+      <View style={[styles.landscapeContent, { minHeight: availableHeight }]}>
         <View style={styles.leftSection}>
           <View style={styles.header}>
             <Text style={styles.progressText}>
@@ -298,7 +301,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF9E6",
   },
   landscapeContent: {
-    flex: 1,
     flexDirection: "row",
     padding: 20,
   },
