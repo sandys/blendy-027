@@ -204,15 +204,8 @@ export default function SoundSlideScreen() {
   });
 
   const isLandscape = width > height;
-  const availableHeight = height - insets.top - insets.bottom;
-  const headerHeight = isLandscape ? 80 : 100;
-  const gameAreaHeight = availableHeight - headerHeight;
-  const tileSize = isLandscape 
-    ? Math.min(width * 0.12, gameAreaHeight * 0.35, 100)
-    : Math.min(width * 0.22, gameAreaHeight * 0.2, 140);
-  const onsetLeft = isLandscape ? width * 0.2 : width * 0.15;
-  const rimeLeft = isLandscape ? width * 0.65 : width * 0.65;
-  const tileTop = headerHeight + (gameAreaHeight / 2) - (tileSize / 2);
+  const tileSize = isLandscape ? 80 : 120;
+  const spacing = isLandscape ? width * 0.15 : width * 0.1;
 
   return (
     <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -223,11 +216,11 @@ export default function SoundSlideScreen() {
         ]} 
         pointerEvents="none"
       />
-      <View style={[styles.header, { height: headerHeight, paddingHorizontal: 20 }]}>
-        <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 16 }]}>
+      <View style={styles.header}>
+        <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 14 }]}>
           Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
         </Text>
-        <Text style={[styles.instructionText, { fontSize: isLandscape ? 18 : 24 }]}>
+        <Text style={[styles.instructionText, { fontSize: isLandscape ? 16 : 20, marginTop: 4 }]}>
           Drag the sounds together to make a word!
         </Text>
       </View>
@@ -235,59 +228,60 @@ export default function SoundSlideScreen() {
       <View style={styles.gameArea}>
         {stage === "initial" && (
           <>
-            <Animated.View
-              style={[
-                styles.onsetTile,
-                isPlayingOnset && styles.tilePlaying,
-                showSuccess && styles.tileSuccess,
-                {
-                  top: tileTop,
-                  left: onsetLeft,
-                  width: tileSize,
-                  height: tileSize,
-                  borderRadius: tileSize * 0.2,
-                  transform: [
-                    { translateX: onsetPosition.x },
-                    { translateY: onsetPosition.y },
-                    { scale: onsetScale },
-                  ],
-                },
-              ]}
-              {...panResponder.panHandlers}
-            >
-              <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.onset}</Text>
-              {isPlayingOnset && (
-                <View style={[styles.audioIndicator, { padding: Math.max(4, tileSize * 0.08) }]}>
-                  <Volume2 size={Math.max(16, tileSize * 0.25)} color="#FFFFFF" />
-                </View>
-              )}
-            </Animated.View>
+            <View style={styles.tilesRow}>
+              <View style={styles.tileWrapper}>
+                <Text style={[styles.guideText, { fontSize: isLandscape ? 12 : 16, marginBottom: 8 }]}>👆 Drag me →</Text>
+                <Animated.View
+                  style={[
+                    styles.onsetTile,
+                    isPlayingOnset && styles.tilePlaying,
+                    showSuccess && styles.tileSuccess,
+                    {
+                      width: tileSize,
+                      height: tileSize,
+                      borderRadius: tileSize * 0.2,
+                      transform: [
+                        { translateX: onsetPosition.x },
+                        { translateY: onsetPosition.y },
+                        { scale: onsetScale },
+                      ],
+                    },
+                  ]}
+                  {...panResponder.panHandlers}
+                >
+                  <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.onset}</Text>
+                  {isPlayingOnset && (
+                    <View style={[styles.audioIndicator, { padding: Math.max(4, tileSize * 0.08) }]}>
+                      <Volume2 size={Math.max(16, tileSize * 0.25)} color="#FFFFFF" />
+                    </View>
+                  )}
+                </Animated.View>
+              </View>
 
-            <Animated.View
-              style={[
-                styles.rimeTile,
-                isPlayingRime && styles.tilePlaying,
-                showSuccess && styles.tileSuccess,
-                {
-                  top: tileTop,
-                  left: rimeLeft,
-                  width: tileSize,
-                  height: tileSize,
-                  borderRadius: tileSize * 0.2,
-                  transform: [{ scale: rimeScale }],
-                },
-              ]}
-            >
-              <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.rime}</Text>
-              {isPlayingRime && (
-                <View style={[styles.audioIndicator, { padding: Math.max(4, tileSize * 0.08) }]}>
-                  <Volume2 size={Math.max(16, tileSize * 0.25)} color="#FFFFFF" />
-                </View>
-              )}
-            </Animated.View>
+              <View style={{ width: spacing }} />
 
-            <View style={[styles.guideContainer, { top: tileTop - (isLandscape ? 40 : 50), left: onsetLeft }]}>
-              <Text style={[styles.guideText, { fontSize: isLandscape ? 14 : 18 }]}>👆 Drag me →</Text>
+              <View style={styles.tileWrapper}>
+                <Animated.View
+                  style={[
+                    styles.rimeTile,
+                    isPlayingRime && styles.tilePlaying,
+                    showSuccess && styles.tileSuccess,
+                    {
+                      width: tileSize,
+                      height: tileSize,
+                      borderRadius: tileSize * 0.2,
+                      transform: [{ scale: rimeScale }],
+                    },
+                  ]}
+                >
+                  <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.rime}</Text>
+                  {isPlayingRime && (
+                    <View style={[styles.audioIndicator, { padding: Math.max(4, tileSize * 0.08) }]}>
+                      <Volume2 size={Math.max(16, tileSize * 0.25)} color="#FFFFFF" />
+                    </View>
+                  )}
+                </Animated.View>
+              </View>
             </View>
           </>
         )}
@@ -318,9 +312,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF8E1",
   },
   header: {
-    paddingTop: 20,
+    paddingVertical: 12,
     paddingHorizontal: 20,
-    marginBottom: 20,
     alignItems: "center",
   },
   instructionText: {
@@ -339,7 +332,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   onsetTile: {
-    position: "absolute",
     backgroundColor: "#FF6B9D",
     justifyContent: "center",
     alignItems: "center",
@@ -350,7 +342,6 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   rimeTile: {
-    position: "absolute",
     backgroundColor: "#4ECDC4",
     justifyContent: "center",
     alignItems: "center",
@@ -390,8 +381,13 @@ const styles = StyleSheet.create({
     fontWeight: "800" as const,
     color: "#FFFFFF",
   },
-  guideContainer: {
-    position: "absolute",
+  tilesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tileWrapper: {
+    alignItems: "center",
   },
   guideText: {
     fontWeight: "600" as const,
