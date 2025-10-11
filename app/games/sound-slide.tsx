@@ -286,7 +286,7 @@ export default function SoundSlideScreen() {
               )}
             </Animated.View>
 
-            <View style={[styles.guideContainer, { top: verticalCenter - tileSize / 2 - (isLandscape ? 40 : 50), left: onsetLeft }]}>
+            <View style={[styles.guideContainer, { top: Math.max(headerHeight + 10, verticalCenter - tileSize / 2 - (isLandscape ? 35 : 50)), left: onsetLeft }]}>
               <Text style={[styles.guideText, { fontSize: isLandscape ? 14 : 20 }]}>👆 Drag me →</Text>
             </View>
           </>
