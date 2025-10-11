@@ -15,13 +15,25 @@ import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
 import { Volume2 } from "lucide-react-native";
 
-const { width, height } = Dimensions.get("window");
+const getResponsiveDimensions = () => {
+  const { width, height } = Dimensions.get("window");
+  const isLandscape = width > height;
+  return { width, height, isLandscape };
+};
 
 export default function SoundSlideScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
+  const [dimensions, setDimensions] = useState(getResponsiveDimensions());
+
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', () => {
+      setDimensions(getResponsiveDimensions());
+    });
+    return () => subscription?.remove();
+  }, []);
 
   const lesson = SAMPLE_LESSONS.find((l) => l.lesson_number === lessonNumber);
   const exercise = lesson?.exercises[exerciseIndex];
@@ -112,8 +124,9 @@ export default function SoundSlideScreen() {
         { useNativeDriver: false }
       ),
       onPanResponderRelease: (_, gestureState) => {
+        const { width, height } = dimensions;
         const targetX = width * 0.5;
-        const targetY = height * 0.45;
+        const targetY = height * 0.5;
         const distance = Math.sqrt(
           Math.pow(gestureState.moveX - targetX, 2) +
             Math.pow(gestureState.moveY - targetY, 2)
@@ -134,7 +147,7 @@ export default function SoundSlideScreen() {
 
           Animated.parallel([
             Animated.spring(onsetPosition, {
-              toValue: { x: width * 0.15, y: 0 },
+              toValue: { x: dimensions.width * 0.25, y: 0 },
               useNativeDriver: true,
             }),
             Animated.spring(onsetScale, {
@@ -204,6 +217,12 @@ export default function SoundSlideScreen() {
     outputRange: ['rgba(255, 211, 61, 0)', 'rgba(255, 211, 61, 0.3)'],
   });
 
+  const { width, height, isLandscape } = dimensions;
+  const tileSize = isLandscape ? Math.min(width * 0.12, 120) : Math.min(height * 0.15, 140);
+  const verticalCenter = height * 0.5;
+  const onsetLeft = isLandscape ? width * 0.2 : width * 0.15;
+  const rimeRight = isLandscape ? width * 0.2 : width * 0.15;
+
   return (
     <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>
       <Animated.View 
@@ -231,6 +250,10 @@ export default function SoundSlideScreen() {
                 isPlayingOnset && styles.tilePlaying,
                 showSuccess && styles.tileSuccess,
                 {
+                  left: onsetLeft,
+                  top: verticalCenter - tileSize / 2,
+                  width: tileSize,
+                  height: tileSize,
                   transform: [
                     { translateX: onsetPosition.x },
                     { translateY: onsetPosition.y },
@@ -254,6 +277,10 @@ export default function SoundSlideScreen() {
                 isPlayingRime && styles.tilePlaying,
                 showSuccess && styles.tileSuccess,
                 {
+                  right: rimeRight,
+                  top: verticalCenter - tileSize / 2,
+                  width: tileSize,
+                  height: tileSize,
                   transform: [{ scale: rimeScale }],
                 },
               ]}
@@ -266,7 +293,7 @@ export default function SoundSlideScreen() {
               )}
             </Animated.View>
 
-            <View style={styles.guideContainer}>
+            <View style={[styles.guideContainer, { top: verticalCenter - tileSize / 2 - 50, left: onsetLeft }]}>
               <Text style={styles.guideText}>👆 Drag me →</Text>
             </View>
           </>
@@ -323,10 +350,6 @@ const styles = StyleSheet.create({
   },
   onsetTile: {
     position: "absolute",
-    left: width * 0.15,
-    top: height * 0.4,
-    width: Math.min(height * 0.2, 140),
-    height: Math.min(height * 0.2, 140),
     borderRadius: 20,
     backgroundColor: "#FF6B9D",
     justifyContent: "center",
@@ -339,10 +362,6 @@ const styles = StyleSheet.create({
   },
   rimeTile: {
     position: "absolute",
-    right: width * 0.15,
-    top: height * 0.4,
-    width: Math.min(height * 0.2, 140),
-    height: Math.min(height * 0.2, 140),
     borderRadius: 20,
     backgroundColor: "#4ECDC4",
     justifyContent: "center",
@@ -381,14 +400,12 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   tileText: {
-    fontSize: 48,
+    fontSize: 42,
     fontWeight: "800" as const,
     color: "#FFFFFF",
   },
   guideContainer: {
     position: "absolute",
-    top: height * 0.3,
-    left: width * 0.15,
   },
   guideText: {
     fontSize: 20,
