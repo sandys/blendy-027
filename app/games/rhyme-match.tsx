@@ -207,7 +207,10 @@ export default function RhymeMatchScreen() {
   });
 
   const isLandscape = width > height;
-  const availableHeight = height - insets.top - insets.bottom;
+  const cardSize = isLandscape ? Math.min(width * 0.15, 140) : 160;
+  const targetCardSize = isLandscape ? Math.min(width * 0.2, 180) : 200;
+  const emojiSize = isLandscape ? 60 : 80;
+  const targetEmojiSize = isLandscape ? 80 : 100;
 
   return (
     <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -218,13 +221,13 @@ export default function RhymeMatchScreen() {
         ]} 
         pointerEvents="none"
       />
-      <View style={[styles.landscapeContent, { minHeight: availableHeight }]}>
+      <View style={styles.landscapeContent}>
         <View style={styles.leftSection}>
           <View style={styles.header}>
-            <Text style={styles.progressText}>
+            <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 16 }]}>
               Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
             </Text>
-            <Text style={styles.instructionText}>
+            <Text style={[styles.instructionText, { fontSize: isLandscape ? 18 : 24 }]}>
               Which one rhymes with?
             </Text>
           </View>
@@ -232,10 +235,14 @@ export default function RhymeMatchScreen() {
           <View style={styles.targetContainer}>
             <View style={[
               styles.targetCard,
-              isPlayingTarget && styles.targetCardPlaying
+              isPlayingTarget && styles.targetCardPlaying,
+              {
+                minWidth: targetCardSize,
+                padding: isLandscape ? 20 : 30,
+              }
             ]}>
-              <Text style={styles.targetEmoji}>{target.image}</Text>
-              <Text style={styles.targetWord}>{target.word}</Text>
+              <Text style={[styles.targetEmoji, { fontSize: targetEmojiSize }]}>{target.image}</Text>
+              <Text style={[styles.targetWord, { fontSize: isLandscape ? 28 : 36 }]}>{target.word}</Text>
               {isPlayingTarget && (
                 <View style={styles.targetAudioIndicator}>
                   <Volume2 size={28} color="#FF6B9D" />
@@ -259,7 +266,11 @@ export default function RhymeMatchScreen() {
                   key={index}
                   style={[
                     styles.choiceWrapper,
-                    { transform: [{ scale: scaleAnims[index] }] },
+                    {
+                      width: cardSize,
+                      height: cardSize,
+                      transform: [{ scale: scaleAnims[index] }],
+                    },
                   ]}
                 >
                   <TouchableOpacity
@@ -274,9 +285,9 @@ export default function RhymeMatchScreen() {
                     activeOpacity={0.7}
                   >
                     <Animated.View style={{ transform: [{ scale: pulseAnims[index] }] }}>
-                      <Text style={styles.choiceEmoji}>{choice.image}</Text>
+                      <Text style={[styles.choiceEmoji, { fontSize: emojiSize }]}>{choice.image}</Text>
                     </Animated.View>
-                    <Text style={styles.choiceWord}>{choice.word}</Text>
+                    <Text style={[styles.choiceWord, { fontSize: isLandscape ? 16 : 20 }]}>{choice.word}</Text>
                     {isPlayingAudio && (
                       <View style={styles.playingIndicator}>
                         <Volume2 size={20} color="#FF6B9D" />
@@ -311,6 +322,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF5F7",
   },
   landscapeContent: {
+    flex: 1,
     flexDirection: "row",
     padding: 20,
   },
@@ -330,18 +342,16 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
-    marginBottom: 30,
+    marginBottom: 20,
     alignItems: "center",
   },
   instructionText: {
-    fontSize: 24,
     fontWeight: "700" as const,
     color: "#FF6B9D",
     textAlign: "center",
     marginBottom: 8,
   },
   progressText: {
-    fontSize: 16,
     color: "#999",
     fontWeight: "600" as const,
     marginBottom: 12,
@@ -354,23 +364,19 @@ const styles = StyleSheet.create({
   targetCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 24,
-    padding: 30,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
-    minWidth: 200,
     borderWidth: 4,
     borderColor: "#FF6B9D",
   },
   targetEmoji: {
-    fontSize: 100,
     marginBottom: 10,
   },
   targetWord: {
-    fontSize: 36,
     fontWeight: "700" as const,
     color: "#333",
   },
@@ -379,12 +385,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     flexWrap: "wrap",
-    gap: 20,
+    gap: 15,
     maxWidth: "100%",
   },
   choiceWrapper: {
-    width: 160,
-    height: 160,
   },
   choiceCard: {
     flex: 1,
@@ -410,11 +414,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFEBEE",
   },
   choiceEmoji: {
-    fontSize: 60,
     marginBottom: 8,
   },
   choiceWord: {
-    fontSize: 20,
     fontWeight: "600" as const,
     color: "#333",
     textAlign: "center",

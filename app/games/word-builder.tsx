@@ -7,7 +7,6 @@ import {
   PanResponder,
   useWindowDimensions,
   Platform,
-  ScrollView,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -54,6 +53,7 @@ export default function WordBuilderScreen() {
   const tileSize = isLandscape ? Math.min(width * 0.12, 90) : Math.min(width * 0.2, 110);
   const dropZoneWidth = isLandscape ? width * 0.4 : width * 0.7;
   const dropZoneHeight = tileSize + 40;
+  const wordCardPadding = isLandscape ? 30 : 50;
 
   useEffect(() => {
     if (!exerciseData) return;
@@ -263,9 +263,6 @@ export default function WordBuilderScreen() {
     outputRange: ["rgba(33, 150, 243, 0)", "rgba(33, 150, 243, 0.3)"],
   });
 
-  const availableHeight = height - insets.top - insets.bottom;
-  const headerHeight = isLandscape ? 80 : 100;
-
   return (
     <View
       style={[
@@ -279,12 +276,8 @@ export default function WordBuilderScreen() {
       ]}
     >
       <Animated.View style={[styles.flashOverlay, { backgroundColor: flashColor }]} pointerEvents="none" />
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
-        <View style={[styles.header, { height: headerHeight }]}>
+      <View style={styles.content}>
+        <View style={styles.header}>
           <Text style={[styles.progressText, { fontSize: isLandscape ? 14 : 16 }]}>
             Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
           </Text>
@@ -293,7 +286,7 @@ export default function WordBuilderScreen() {
           </Text>
         </View>
 
-        <View style={[styles.buildArea, { minHeight: availableHeight - headerHeight }]}>
+        <View style={styles.buildArea}>
           {stage === "initial" && (
             <>
               <View
@@ -368,7 +361,7 @@ export default function WordBuilderScreen() {
 
           {stage === "complete" && (
             <View style={styles.completeContainer}>
-              <View style={[styles.wordCard, { padding: isLandscape ? 30 : 50 }]}>
+              <View style={[styles.wordCard, { padding: wordCardPadding }]}>
                 {exerciseData?.image && (
                   <Text style={[styles.wordEmoji, { fontSize: isLandscape ? 70 : 100 }]}>
                     {exerciseData.image}
@@ -385,7 +378,7 @@ export default function WordBuilderScreen() {
             </View>
           )}
         </View>
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -395,10 +388,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#E3F2FD",
   },
+  content: {
+    flex: 1,
+  },
   header: {
-    paddingTop: 20,
+    paddingVertical: 12,
     paddingHorizontal: 20,
-    marginBottom: 20,
     alignItems: "center",
   },
   instructionText: {
@@ -412,6 +407,7 @@ const styles = StyleSheet.create({
     fontWeight: "600" as const,
   },
   buildArea: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 20,

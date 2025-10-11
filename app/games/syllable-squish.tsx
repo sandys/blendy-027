@@ -178,7 +178,6 @@ export default function SyllableSquishScreen() {
   });
 
   const isLandscape = width > height;
-  const availableHeight = height - insets.top - insets.bottom;
   const buttonSize = isLandscape ? Math.min(width * 0.15, 140) : 180;
   const progressSize = isLandscape ? 40 : 50;
 
@@ -191,7 +190,7 @@ export default function SyllableSquishScreen() {
         ]} 
         pointerEvents="none"
       />
-      <View style={[styles.landscapeContent, { minHeight: availableHeight }]}>
+      <View style={styles.landscapeContent}>
         <View style={styles.leftSection}>
           <View style={styles.header}>
             <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 14 }]}>
@@ -310,6 +309,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF9E6",
   },
   landscapeContent: {
+    flex: 1,
     flexDirection: "row",
     padding: 20,
   },

@@ -184,7 +184,8 @@ export default function SoundDetectiveScreen() {
   });
 
   const isLandscape = width > height;
-  const availableHeight = height - insets.top - insets.bottom;
+  const choiceButtonSize = isLandscape ? 90 : 110;
+  const wordCardPadding = isLandscape ? 20 : 30;
 
   return (
     <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -195,13 +196,13 @@ export default function SoundDetectiveScreen() {
         ]} 
         pointerEvents="none"
       />
-      <View style={[styles.landscapeContent, { minHeight: availableHeight }]}>
+      <View style={styles.landscapeContent}>
         <View style={styles.leftSection}>
           <View style={styles.header}>
-            <Text style={styles.progressText}>
+            <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 16 }]}>
               Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
             </Text>
-            <Text style={styles.instructionText}>
+            <Text style={[styles.instructionText, { fontSize: isLandscape ? 18 : 26 }]}>
               What is the {getPositionText()} sound?
             </Text>
           </View>
@@ -209,10 +210,11 @@ export default function SoundDetectiveScreen() {
           <View style={styles.wordContainer}>
             <View style={[
               styles.wordCard,
-              isPlayingWord && styles.wordCardPlaying
+              isPlayingWord && styles.wordCardPlaying,
+              { padding: wordCardPadding }
             ]}>
-              <Text style={styles.wordEmoji}>{exerciseData?.image}</Text>
-              <Text style={styles.wordText}>{exerciseData?.word}</Text>
+              <Text style={[styles.wordEmoji, { fontSize: isLandscape ? 70 : 100 }]}>{exerciseData?.image}</Text>
+              <Text style={[styles.wordText, { fontSize: isLandscape ? 36 : 48 }]}>{exerciseData?.word}</Text>
               {isPlayingWord && (
                 <View style={styles.audioIndicator}>
                   <Volume2 size={28} color="#4CAF50" />
@@ -243,6 +245,8 @@ export default function SoundDetectiveScreen() {
                   showCorrect && styles.choiceButtonCorrect,
                   showIncorrect && styles.choiceButtonIncorrect,
                   {
+                    width: choiceButtonSize,
+                    height: choiceButtonSize,
                     transform: [{ scale: scaleAnims[index] }],
                   },
                 ]}
@@ -251,6 +255,7 @@ export default function SoundDetectiveScreen() {
                   style={[
                     styles.choiceText,
                     (showCorrect || showIncorrect) && styles.choiceTextSelected,
+                    { fontSize: choiceButtonSize * 0.36 },
                   ]}
                 >
                   {choice}
@@ -268,8 +273,8 @@ export default function SoundDetectiveScreen() {
                 isCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect,
               ]}
             >
-              <Text style={styles.feedbackEmoji}>{isCorrect ? "🎉" : "🤔"}</Text>
-              <Text style={styles.feedbackText}>
+              <Text style={[styles.feedbackEmoji, { fontSize: isLandscape ? 50 : 72 }]}>{isCorrect ? "🎉" : "🤔"}</Text>
+              <Text style={[styles.feedbackText, { fontSize: isLandscape ? 24 : 32 }]}>
                 {isCorrect ? "Perfect!" : "Try again!"}
               </Text>
             </View>
@@ -286,6 +291,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#E8F5E9",
   },
   landscapeContent: {
+    flex: 1,
     flexDirection: "row",
     padding: 20,
   },
@@ -301,18 +307,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   header: {
-    marginBottom: 30,
+    marginBottom: 20,
     alignItems: "center",
   },
   instructionText: {
-    fontSize: 26,
     fontWeight: "700" as const,
     color: "#4CAF50",
     textAlign: "center",
     marginBottom: 8,
   },
   progressText: {
-    fontSize: 16,
     color: "#999",
     fontWeight: "600" as const,
   },
@@ -324,14 +328,13 @@ const styles = StyleSheet.create({
   wordCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 24,
-    padding: 30,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
-    minWidth: 200,
+    minWidth: 180,
     borderWidth: 4,
     borderColor: "#4CAF50",
   },
@@ -354,11 +357,9 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   wordEmoji: {
-    fontSize: 100,
-    marginBottom: 20,
+    marginBottom: 15,
   },
   wordText: {
-    fontSize: 48,
     fontWeight: "800" as const,
     color: "#1A1A1A",
   },
@@ -366,13 +367,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     flexWrap: "wrap",
-    gap: 20,
+    gap: 15,
     marginBottom: 20,
     maxWidth: "100%",
   },
   choiceButton: {
-    width: 110,
-    height: 110,
     borderRadius: 20,
     backgroundColor: "#FFFFFF",
     justifyContent: "center",
@@ -394,7 +393,6 @@ const styles = StyleSheet.create({
     borderColor: "#F44336",
   },
   choiceText: {
-    fontSize: 40,
     fontWeight: "800" as const,
     color: "#4CAF50",
   },
@@ -416,11 +414,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFEBEE",
   },
   feedbackEmoji: {
-    fontSize: 72,
     marginBottom: 12,
   },
   feedbackText: {
-    fontSize: 32,
     fontWeight: "700" as const,
     textAlign: "center",
     color: "#333",

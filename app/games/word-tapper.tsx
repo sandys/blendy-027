@@ -167,7 +167,8 @@ export default function WordTapperScreen() {
   });
 
   const isLandscape = width > height;
-  const availableHeight = height - insets.top - insets.bottom;
+  const circleSize = isLandscape ? 70 : 90;
+  const sentenceCardPadding = isLandscape ? 20 : 30;
 
   return (
     <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -178,13 +179,13 @@ export default function WordTapperScreen() {
         ]} 
         pointerEvents="none"
       />
-      <View style={[styles.landscapeContent, { minHeight: availableHeight }]}>
+      <View style={styles.landscapeContent}>
         <View style={styles.leftSection}>
           <View style={styles.header}>
-            <Text style={styles.progressText}>
+            <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 14 }]}>
               Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
             </Text>
-            <Text style={styles.instructionText}>
+            <Text style={[styles.instructionText, { fontSize: isLandscape ? 18 : 26 }]}>
               Tap a circle for each word you hear
             </Text>
           </View>
@@ -192,9 +193,10 @@ export default function WordTapperScreen() {
           <View style={styles.sentenceContainer}>
             <View style={[
               styles.sentenceCard,
-              isPlayingSentence && styles.sentenceCardPlaying
+              isPlayingSentence && styles.sentenceCardPlaying,
+              { padding: sentenceCardPadding }
             ]}>
-              <Text style={styles.sentenceText}>{sentence}</Text>
+              <Text style={[styles.sentenceText, { fontSize: isLandscape ? 22 : 28 }]}>{sentence}</Text>
               {isPlayingSentence && (
                 <View style={styles.audioIndicator}>
                   <Volume2 size={28} color="#4ECDC4" />
@@ -226,10 +228,15 @@ export default function WordTapperScreen() {
                 style={[
                   styles.circle,
                   isTapped && styles.circleFilled,
-                  { transform: [{ scale }] },
+                  {
+                    width: circleSize,
+                    height: circleSize,
+                    borderRadius: circleSize / 2,
+                    transform: [{ scale }],
+                  },
                 ]}
               >
-                {isTapped && <Text style={styles.circleNumber}>{index + 1}</Text>}
+                {isTapped && <Text style={[styles.circleNumber, { fontSize: circleSize * 0.4 }]}>{index + 1}</Text>}
               </Animated.View>
             </TouchableOpacity>
           );
@@ -237,14 +244,23 @@ export default function WordTapperScreen() {
           </View>
 
           <View style={styles.counterContainer}>
-            <Text style={styles.counterText}>
+            <Text style={[styles.counterText, { fontSize: isLandscape ? 16 : 20 }]}>
               Words tapped: {tapCount} / {wordCount}
             </Text>
           </View>
 
           {showSubmit && !showFeedback && (
-            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-              <Text style={styles.submitButtonText}>Check Answer</Text>
+            <TouchableOpacity 
+              style={[
+                styles.submitButton,
+                {
+                  paddingVertical: isLandscape ? 12 : 16,
+                  paddingHorizontal: isLandscape ? 30 : 40,
+                }
+              ]} 
+              onPress={handleSubmit}
+            >
+              <Text style={[styles.submitButtonText, { fontSize: isLandscape ? 16 : 20 }]}>Check Answer</Text>
             </TouchableOpacity>
           )}
 
@@ -255,10 +271,10 @@ export default function WordTapperScreen() {
                 isCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect,
               ]}
             >
-              <Text style={styles.feedbackEmoji}>
+              <Text style={[styles.feedbackEmoji, { fontSize: isLandscape ? 50 : 72 }]}>
                 {isCorrect ? "🎉" : "🤔"}
               </Text>
-              <Text style={styles.feedbackText}>
+              <Text style={[styles.feedbackText, { fontSize: isLandscape ? 24 : 32 }]}>
                 {isCorrect ? "Perfect!" : "Try again!"}
               </Text>
             </View>
@@ -275,6 +291,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0F8FF",
   },
   landscapeContent: {
+    flex: 1,
     flexDirection: "row",
     padding: 20,
   },
@@ -290,18 +307,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   header: {
-    marginBottom: 30,
+    marginBottom: 20,
     alignItems: "center",
   },
   instructionText: {
-    fontSize: 26,
     fontWeight: "700" as const,
     color: "#4ECDC4",
     textAlign: "center",
     marginBottom: 8,
   },
   progressText: {
-    fontSize: 14,
     color: "#999",
     fontWeight: "600" as const,
     marginBottom: 12,
@@ -314,13 +329,12 @@ const styles = StyleSheet.create({
   sentenceCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 24,
-    padding: 30,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
-    minWidth: 250,
+    minWidth: 200,
     borderWidth: 4,
     borderColor: "#4ECDC4",
   },
@@ -335,7 +349,6 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   sentenceText: {
-    fontSize: 28,
     fontWeight: "700" as const,
     color: "#333",
     textAlign: "center",
@@ -352,15 +365,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     flexWrap: "wrap",
-    gap: 20,
+    gap: 15,
     marginBottom: 20,
     maxWidth: "100%",
   },
   circle: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    borderWidth: 5,
+    borderWidth: 4,
     borderColor: "#4ECDC4",
     backgroundColor: "#FFFFFF",
     justifyContent: "center",
@@ -370,7 +380,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#4ECDC4",
   },
   circleNumber: {
-    fontSize: 36,
     fontWeight: "700" as const,
     color: "#FFFFFF",
   },
@@ -379,14 +388,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   counterText: {
-    fontSize: 20,
     fontWeight: "600" as const,
     color: "#666",
   },
   submitButton: {
     backgroundColor: "#4ECDC4",
-    paddingVertical: 16,
-    paddingHorizontal: 40,
     borderRadius: 30,
     alignSelf: "center",
     shadowColor: "#000",
@@ -396,7 +402,6 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   submitButtonText: {
-    fontSize: 20,
     fontWeight: "700" as const,
     color: "#FFFFFF",
   },
@@ -415,11 +420,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFEBEE",
   },
   feedbackEmoji: {
-    fontSize: 72,
     marginBottom: 12,
   },
   feedbackText: {
-    fontSize: 32,
     fontWeight: "700" as const,
     textAlign: "center",
     color: "#333",
