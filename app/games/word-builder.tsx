@@ -3,19 +3,28 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Animated,
+  PanResponder,
   useWindowDimensions,
   Platform,
+  ScrollView,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
-import { Volume2 } from "lucide-react-native";
+import { Volume2, CheckCircle } from "lucide-react-native";
 
 type BuildStage = "initial" | "first-blend" | "final-blend" | "complete";
+
+interface DraggableLetter {
+  id: string;
+  letter: string;
+  position: Animated.ValueXY;
+  isInDropZone: boolean;
+  scale: Animated.Value;
+}
 
 export default function WordBuilderScreen() {
   const insets = useSafeAreaInsets();
@@ -32,17 +41,33 @@ export default function WordBuilderScreen() {
     | undefined;
 
   const [stage, setStage] = useState<BuildStage>("initial");
-  const [showFeedback, setShowFeedback] = useState<boolean>(false);
   const [playingLetterIndex, setPlayingLetterIndex] = useState<number | null>(null);
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
+  const [draggableLetters, setDraggableLetters] = useState<DraggableLetter[]>([]);
+  const [blendedText, setBlendedText] = useState<string>("");
   const audioLoopRef = useRef<boolean>(true);
   const isCorrectAnswerGiven = useRef<boolean>(false);
+  const dropZoneLayout = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const flashAnim = useRef(new Animated.Value(0)).current;
 
-  const letter1Scale = useRef(new Animated.Value(1)).current;
-  const letter2Scale = useRef(new Animated.Value(1)).current;
-  const letter3Scale = useRef(new Animated.Value(1)).current;
-  const mergedScale = useRef(new Animated.Value(1)).current;
+  const isLandscape = width > height;
+  const tileSize = isLandscape ? Math.min(width * 0.12, 90) : Math.min(width * 0.2, 110);
+  const dropZoneWidth = isLandscape ? width * 0.4 : width * 0.7;
+  const dropZoneHeight = tileSize + 40;
+
+  useEffect(() => {
+    if (!exerciseData) return;
+
+    const letters: DraggableLetter[] = exerciseData.letters.map((letter, index) => ({
+      id: `letter-${index}`,
+      letter,
+      position: new Animated.ValueXY({ x: 0, y: 0 }),
+      isInDropZone: false,
+      scale: new Animated.Value(1),
+    }));
+
+    setDraggableLetters(letters);
+  }, [exerciseData]);
 
   useEffect(() => {
     if (!exerciseData || stage !== "initial") return;
@@ -63,28 +88,28 @@ export default function WordBuilderScreen() {
           useNativeDriver: false,
         }),
       ]).start();
-      
+
       if (Platform.OS !== "web") {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       }
-      
-      await new Promise(resolve => setTimeout(resolve, 500));
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
     };
 
     const playAudioLoop = async () => {
       await playInitialFeedback();
-      
+
       while (audioLoopRef.current && !isCorrectAnswerGiven.current && stage === "initial") {
         for (let i = 0; i < exerciseData.letters.length; i++) {
           if (!audioLoopRef.current || isCorrectAnswerGiven.current) break;
-          
+
           setPlayingLetterIndex(i);
           await speakText(exerciseData.letters[i], { usePhoneme: true });
-          await new Promise(resolve => setTimeout(resolve, 600));
+          await new Promise((resolve) => setTimeout(resolve, 600));
         }
-        
+
         setPlayingLetterIndex(null);
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise((resolve) => setTimeout(resolve, 1500));
       }
     };
 
@@ -103,144 +128,108 @@ export default function WordBuilderScreen() {
     );
   }
 
-  const handleFirstBlend = async () => {
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-
-    const isTwoLetterWord = exerciseData?.letters.length === 2;
-    setShowSuccess(true);
-
-    if (isTwoLetterWord) {
-      await speakText(exerciseData?.word || "", { usePhoneme: false, rate: 0.7 });
-      Animated.parallel([
-        Animated.sequence([
-          Animated.timing(letter1Scale, {
-            toValue: 1.2,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(letter1Scale, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.sequence([
-          Animated.timing(letter2Scale, {
-            toValue: 1.2,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(letter2Scale, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]),
-      ]).start(() => {
-        isCorrectAnswerGiven.current = true;
-        audioLoopRef.current = false;
-        setPlayingLetterIndex(null);
-
+  const createPanResponder = (letterIndex: number) => {
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
         if (Platform.OS !== "web") {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
-        setStage("complete");
-        setShowFeedback(true);
-
-        setTimeout(() => {
-          const nextExerciseIndex = exerciseIndex + 1;
-          if (lesson && nextExerciseIndex < lesson.exercises.length) {
-            router.replace({
-              pathname: "/games/word-builder",
-              params: { lesson: lessonNumber, exercise: nextExerciseIndex },
-            });
-          } else {
-            router.back();
-          }
-        }, 2500);
-      });
-    } else {
-      Animated.parallel([
-        Animated.sequence([
-          Animated.timing(letter1Scale, {
-            toValue: 1.2,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(letter1Scale, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.sequence([
-          Animated.timing(letter2Scale, {
-            toValue: 1.2,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(letter2Scale, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.spring(mergedScale, {
-          toValue: 1.3,
+        Animated.spring(draggableLetters[letterIndex].scale, {
+          toValue: 1.1,
           useNativeDriver: true,
           friction: 3,
-        }),
-      ]).start(async () => {
-        const firstBlend = exerciseData?.letters.slice(0, 2).join("") || "";
-        await speakText(firstBlend, { usePhoneme: false, rate: 0.7 });
-        
-        Animated.spring(mergedScale, {
+        }).start();
+      },
+      onPanResponderMove: (_, gesture) => {
+        draggableLetters[letterIndex].position.setValue({
+          x: gesture.dx,
+          y: gesture.dy,
+        });
+      },
+      onPanResponderRelease: (evt, gesture) => {
+        Animated.spring(draggableLetters[letterIndex].scale, {
           toValue: 1,
           useNativeDriver: true,
+          friction: 3,
         }).start();
-        setStage("first-blend");
-        setShowSuccess(false);
-      });
-    }
+
+        if (!dropZoneLayout.current) {
+          Animated.spring(draggableLetters[letterIndex].position, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: false,
+            friction: 5,
+          }).start();
+          return;
+        }
+
+        const dropZone = dropZoneLayout.current;
+        const absoluteX = evt.nativeEvent.pageX;
+        const absoluteY = evt.nativeEvent.pageY;
+
+        const isInDropZone =
+          absoluteX >= dropZone.x &&
+          absoluteX <= dropZone.x + dropZone.width &&
+          absoluteY >= dropZone.y &&
+          absoluteY <= dropZone.y + dropZone.height;
+
+        if (isInDropZone) {
+          if (Platform.OS !== "web") {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+
+          const updatedLetters = [...draggableLetters];
+          updatedLetters[letterIndex].isInDropZone = true;
+          setDraggableLetters(updatedLetters);
+
+          Animated.spring(draggableLetters[letterIndex].position, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: false,
+            friction: 5,
+          }).start();
+
+          checkBlendCompletion(updatedLetters);
+        } else {
+          Animated.spring(draggableLetters[letterIndex].position, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: false,
+            friction: 5,
+          }).start();
+        }
+      },
+    });
   };
 
-  const handleFinalBlend = async () => {
+  const checkBlendCompletion = async (letters: DraggableLetter[]) => {
+    const allInDropZone = letters.every((l) => l.isInDropZone);
+
+    if (!allInDropZone) {
+      const inDropZone = letters.filter((l) => l.isInDropZone);
+      if (inDropZone.length > 0) {
+        const partialBlend = inDropZone.map((l) => l.letter).join("");
+        setBlendedText(partialBlend);
+        await speakText(partialBlend, { usePhoneme: false, rate: 0.7 });
+      }
+      return;
+    }
+
     isCorrectAnswerGiven.current = true;
     audioLoopRef.current = false;
     setPlayingLetterIndex(null);
     setShowSuccess(true);
 
+    const fullWord = exerciseData?.word || "";
+    setBlendedText(fullWord);
+
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
 
-    await speakText(exerciseData?.word || "", { usePhoneme: false, rate: 0.7 });
+    await speakText(fullWord, { usePhoneme: false, rate: 0.7 });
 
-    Animated.parallel([
-      Animated.sequence([
-        Animated.timing(letter3Scale, {
-          toValue: 1.2,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(letter3Scale, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.sequence([
-        Animated.timing(mergedScale, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start(() => {
+    setTimeout(() => {
       setStage("complete");
-      setShowFeedback(true);
 
       setTimeout(() => {
         const nextExerciseIndex = exerciseIndex + 1;
@@ -253,18 +242,13 @@ export default function WordBuilderScreen() {
           router.back();
         }
       }, 2500);
-    });
+    }, 1000);
   };
 
   const getInstructionText = () => {
-    const isTwoLetterWord = exerciseData?.letters.length === 2;
     switch (stage) {
       case "initial":
-        return isTwoLetterWord
-          ? "Tap to blend the sounds together"
-          : "Tap to blend the first two sounds";
-      case "first-blend":
-        return "Now add the last sound!";
+        return "Drag the letters into the box to blend them";
       case "complete":
         return "You built the word!";
       default:
@@ -274,143 +258,132 @@ export default function WordBuilderScreen() {
 
   const flashColor = flashAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(33, 150, 243, 0)', 'rgba(33, 150, 243, 0.3)'],
+    outputRange: ["rgba(33, 150, 243, 0)", "rgba(33, 150, 243, 0.3)"],
   });
 
   const availableHeight = height - insets.top - insets.bottom;
-  const headerHeight = 100;
-  const buildAreaHeight = availableHeight - headerHeight;
+  const headerHeight = isLandscape ? 80 : 100;
 
   return (
-    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <Animated.View 
-        style={[
-          styles.flashOverlay,
-          { backgroundColor: flashColor }
-        ]} 
-        pointerEvents="none"
-      />
-      <View style={[styles.header, { height: headerHeight }]}>
-        <Text style={styles.progressText}>
-          Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
-        </Text>
-        <Text style={styles.instructionText}>{getInstructionText()}</Text>
-      </View>
-
-      <View style={[styles.buildArea, { height: buildAreaHeight }]}>
-        {stage === "initial" && (
-          <>
-            <View style={styles.lettersRow}>
-              <Animated.View
-                style={[
-                  styles.letterTile,
-                  playingLetterIndex === 0 && styles.letterTilePlaying,
-                  showSuccess && styles.letterTileSuccess,
-                  { transform: [{ scale: letter1Scale }] },
-                ]}
-              >
-                <Text style={styles.letterText}>
-                  {exerciseData?.letters[0]}
-                </Text>
-                {playingLetterIndex === 0 && (
-                  <View style={styles.audioIndicator}>
-                    <Volume2 size={20} color="#FFFFFF" />
-                  </View>
-                )}
-              </Animated.View>
-
-              <Animated.View
-                style={[
-                  styles.letterTile,
-                  playingLetterIndex === 1 && styles.letterTilePlaying,
-                  showSuccess && styles.letterTileSuccess,
-                  { transform: [{ scale: letter2Scale }] },
-                ]}
-              >
-                <Text style={styles.letterText}>
-                  {exerciseData?.letters[1]}
-                </Text>
-                {playingLetterIndex === 1 && (
-                  <View style={styles.audioIndicator}>
-                    <Volume2 size={20} color="#FFFFFF" />
-                  </View>
-                )}
-              </Animated.View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.blendButton}
-              onPress={handleFirstBlend}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.blendButtonText}>Blend →</Text>
-            </TouchableOpacity>
-          </>
-        )}
-
-        {stage === "first-blend" && (
-          <>
-            <View style={styles.lettersRow}>
-              <Animated.View
-                style={[
-                  styles.mergedTile,
-                  showSuccess && styles.mergedTileSuccess,
-                  { transform: [{ scale: mergedScale }] },
-                ]}
-              >
-                <Text style={styles.mergedText}>
-                  {exerciseData?.letters[0]}
-                  {exerciseData?.letters[1]}
-                </Text>
-              </Animated.View>
-
-              <Animated.View
-                style={[
-                  styles.letterTile,
-                  playingLetterIndex === 2 && styles.letterTilePlaying,
-                  showSuccess && styles.letterTileSuccess,
-                  { transform: [{ scale: letter3Scale }] },
-                ]}
-              >
-                <Text style={styles.letterText}>
-                  {exerciseData?.letters[2]}
-                </Text>
-                {playingLetterIndex === 2 && (
-                  <View style={styles.audioIndicator}>
-                    <Volume2 size={20} color="#FFFFFF" />
-                  </View>
-                )}
-              </Animated.View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.blendButton}
-              onPress={handleFinalBlend}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.blendButtonText}>Blend →</Text>
-            </TouchableOpacity>
-          </>
-        )}
-
-        {stage === "complete" && (
-          <View style={styles.completeContainer}>
-            <View style={styles.wordCard}>
-              {exerciseData?.image && (
-                <Text style={styles.wordEmoji}>{exerciseData.image}</Text>
-              )}
-              <Text style={styles.completeWord}>{exerciseData?.word}</Text>
-            </View>
-          </View>
-        )}
-      </View>
-
-      {showFeedback && (
-        <View style={styles.feedbackContainer}>
-          <Text style={styles.feedbackEmoji}>🎉</Text>
-          <Text style={styles.feedbackText}>Amazing!</Text>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+        },
+      ]}
+    >
+      <Animated.View style={[styles.flashOverlay, { backgroundColor: flashColor }]} pointerEvents="none" />
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        <View style={[styles.header, { height: headerHeight }]}>
+          <Text style={[styles.progressText, { fontSize: isLandscape ? 14 : 16 }]}>
+            Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
+          </Text>
+          <Text style={[styles.instructionText, { fontSize: isLandscape ? 20 : 24 }]}>
+            {getInstructionText()}
+          </Text>
         </View>
-      )}
+
+        <View style={[styles.buildArea, { minHeight: availableHeight - headerHeight }]}>
+          {stage === "initial" && (
+            <>
+              <View
+                style={[
+                  styles.dropZone,
+                  {
+                    width: dropZoneWidth,
+                    height: dropZoneHeight,
+                    borderColor: showSuccess ? "#4CAF50" : "#2196F3",
+                    backgroundColor: showSuccess ? "rgba(76, 175, 80, 0.1)" : "rgba(33, 150, 243, 0.1)",
+                  },
+                ]}
+                onLayout={(event) => {
+                  event.target.measure((x, y, width, height, pageX, pageY) => {
+                    dropZoneLayout.current = { x: pageX, y: pageY, width, height };
+                  });
+                }}
+              >
+                {blendedText ? (
+                  <View style={styles.blendedContainer}>
+                    <Text style={[styles.blendedText, { fontSize: tileSize * 0.5 }]}>{blendedText}</Text>
+                    {showSuccess && <CheckCircle size={tileSize * 0.4} color="#4CAF50" />}
+                  </View>
+                ) : (
+                  <Text style={[styles.dropZoneText, { fontSize: isLandscape ? 16 : 18 }]}>Drop letters here</Text>
+                )}
+              </View>
+
+              <View style={[styles.lettersRow, { gap: isLandscape ? 15 : 20, marginTop: isLandscape ? 30 : 40 }]}>
+                {draggableLetters.map((draggableLetter, index) => {
+                  if (draggableLetter.isInDropZone) {
+                    return <View key={draggableLetter.id} style={{ width: tileSize, height: tileSize }} />;
+                  }
+
+                  const panResponder = createPanResponder(index);
+
+                  return (
+                    <Animated.View
+                      key={draggableLetter.id}
+                      {...panResponder.panHandlers}
+                      style={[
+                        styles.letterTile,
+                        {
+                          width: tileSize,
+                          height: tileSize,
+                          borderRadius: tileSize * 0.18,
+                        },
+                        playingLetterIndex === index && styles.letterTilePlaying,
+                        {
+                          transform: [
+                            { translateX: draggableLetter.position.x },
+                            { translateY: draggableLetter.position.y },
+                            { scale: draggableLetter.scale },
+                          ],
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.letterText, { fontSize: tileSize * 0.44 }]}>
+                        {draggableLetter.letter}
+                      </Text>
+                      {playingLetterIndex === index && (
+                        <View style={styles.audioIndicator}>
+                          <Volume2 size={tileSize * 0.18} color="#FFFFFF" />
+                        </View>
+                      )}
+                    </Animated.View>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          {stage === "complete" && (
+            <View style={styles.completeContainer}>
+              <View style={[styles.wordCard, { padding: isLandscape ? 30 : 50 }]}>
+                {exerciseData?.image && (
+                  <Text style={[styles.wordEmoji, { fontSize: isLandscape ? 70 : 100 }]}>
+                    {exerciseData.image}
+                  </Text>
+                )}
+                <Text style={[styles.completeWord, { fontSize: isLandscape ? 48 : 64 }]}>
+                  {exerciseData?.word}
+                </Text>
+              </View>
+              <View style={[styles.feedbackContainer, { marginTop: isLandscape ? 20 : 30 }]}>
+                <Text style={[styles.feedbackEmoji, { fontSize: isLandscape ? 50 : 72 }]}>🎉</Text>
+                <Text style={[styles.feedbackText, { fontSize: isLandscape ? 24 : 32 }]}>Amazing!</Text>
+              </View>
+            </View>
+          )}
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -427,30 +400,46 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   instructionText: {
-    fontSize: 24,
     fontWeight: "700" as const,
     color: "#2196F3",
     textAlign: "center",
     marginBottom: 8,
   },
   progressText: {
-    fontSize: 16,
     color: "#999",
     fontWeight: "600" as const,
   },
   buildArea: {
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  dropZone: {
+    borderWidth: 3,
+    borderStyle: "dashed",
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dropZoneText: {
+    color: "#2196F3",
+    fontWeight: "600" as const,
+  },
+  blendedContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  blendedText: {
+    fontWeight: "800" as const,
+    color: "#2196F3",
   },
   lettersRow: {
     flexDirection: "row",
-    gap: 20,
-    marginBottom: 40,
+    flexWrap: "wrap",
+    justifyContent: "center",
   },
   letterTile: {
-    width: 110,
-    height: 110,
-    borderRadius: 20,
     backgroundColor: "#2196F3",
     justifyContent: "center",
     alignItems: "center",
@@ -469,26 +458,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 10,
   },
-  letterTileSuccess: {
-    backgroundColor: "#4CAF50",
-    borderWidth: 4,
-    borderColor: "#FFFFFF",
-    shadowColor: "#4CAF50",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 16,
-    elevation: 12,
-  },
-  mergedTileSuccess: {
-    backgroundColor: "#4CAF50",
-    borderWidth: 4,
-    borderColor: "#FFFFFF",
-    shadowColor: "#4CAF50",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 16,
-    elevation: 12,
-  },
   audioIndicator: {
     position: "absolute",
     top: 6,
@@ -498,41 +467,6 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   letterText: {
-    fontSize: 48,
-    fontWeight: "800" as const,
-    color: "#FFFFFF",
-  },
-  mergedTile: {
-    width: 150,
-    height: 110,
-    borderRadius: 20,
-    backgroundColor: "#FF6B9D",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  mergedText: {
-    fontSize: 48,
-    fontWeight: "800" as const,
-    color: "#FFFFFF",
-  },
-  blendButton: {
-    backgroundColor: "#4CAF50",
-    paddingVertical: 20,
-    paddingHorizontal: 50,
-    borderRadius: 30,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  blendButtonText: {
-    fontSize: 28,
     fontWeight: "800" as const,
     color: "#FFFFFF",
   },
@@ -543,7 +477,6 @@ const styles = StyleSheet.create({
   wordCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 30,
-    padding: 50,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
@@ -552,18 +485,13 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   wordEmoji: {
-    fontSize: 100,
     marginBottom: 20,
   },
   completeWord: {
-    fontSize: 64,
     fontWeight: "800" as const,
     color: "#1A1A1A",
   },
   feedbackContainer: {
-    position: "absolute",
-    bottom: 80,
-    alignSelf: "center",
     backgroundColor: "#E8F5E9",
     padding: 20,
     borderRadius: 20,
@@ -571,11 +499,9 @@ const styles = StyleSheet.create({
     minWidth: 200,
   },
   feedbackEmoji: {
-    fontSize: 72,
     marginBottom: 12,
   },
   feedbackText: {
-    fontSize: 32,
     fontWeight: "700" as const,
     textAlign: "center",
     color: "#333",
