@@ -5,7 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
-  Dimensions,
+  useWindowDimensions,
   Platform,
 } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -15,10 +15,9 @@ import { Volume2 } from "lucide-react-native";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
 
-const { height } = Dimensions.get("window");
-
 export default function RhymeMatchScreen() {
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
@@ -382,8 +381,8 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
   },
   choiceWrapper: {
-    width: Math.min((height - 100) / 3, 180),
-    height: Math.min((height - 100) / 3, 180),
+    width: 160,
+    height: 160,
   },
   choiceCard: {
     flex: 1,

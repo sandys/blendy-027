@@ -5,7 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
-  Dimensions,
+  useWindowDimensions,
   Platform,
 } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -15,10 +15,9 @@ import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
 import { Volume2 } from "lucide-react-native";
 
-const { width, height } = Dimensions.get("window");
-
 export default function SoundDetectiveScreen() {
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
@@ -370,8 +369,8 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
   },
   choiceButton: {
-    width: Math.min((height - 100) / 3.5, 120),
-    height: Math.min((height - 100) / 3.5, 120),
+    width: 110,
+    height: 110,
     borderRadius: 20,
     backgroundColor: "#FFFFFF",
     justifyContent: "center",

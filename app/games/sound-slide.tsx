@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   Animated,
-  Dimensions,
+  useWindowDimensions,
   Platform,
   PanResponder,
 } from "react-native";
@@ -15,25 +15,12 @@ import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
 import { Volume2 } from "lucide-react-native";
 
-const getResponsiveDimensions = () => {
-  const { width, height } = Dimensions.get("window");
-  const isLandscape = width > height;
-  return { width, height, isLandscape };
-};
-
 export default function SoundSlideScreen() {
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
-  const [dimensions, setDimensions] = useState(getResponsiveDimensions());
-
-  useEffect(() => {
-    const subscription = Dimensions.addEventListener('change', () => {
-      setDimensions(getResponsiveDimensions());
-    });
-    return () => subscription?.remove();
-  }, []);
 
   const lesson = SAMPLE_LESSONS.find((l) => l.lesson_number === lessonNumber);
   const exercise = lesson?.exercises[exerciseIndex];
@@ -124,7 +111,6 @@ export default function SoundSlideScreen() {
         { useNativeDriver: false }
       ),
       onPanResponderRelease: (_, gestureState) => {
-        const { width, height } = dimensions;
         const targetX = width * 0.5;
         const targetY = height * 0.5;
         const distance = Math.sqrt(
@@ -147,7 +133,7 @@ export default function SoundSlideScreen() {
 
           Animated.parallel([
             Animated.spring(onsetPosition, {
-              toValue: { x: dimensions.width * 0.25, y: 0 },
+              toValue: { x: width * 0.25, y: 0 },
               useNativeDriver: true,
             }),
             Animated.spring(onsetScale, {
@@ -217,11 +203,11 @@ export default function SoundSlideScreen() {
     outputRange: ['rgba(255, 211, 61, 0)', 'rgba(255, 211, 61, 0.3)'],
   });
 
-  const { width, height, isLandscape } = dimensions;
-  const tileSize = isLandscape ? Math.min(width * 0.12, 120) : Math.min(height * 0.15, 140);
+  const isLandscape = width > height;
+  const tileSize = Math.min(width * 0.12, height * 0.25, 120);
   const verticalCenter = height * 0.5;
-  const onsetLeft = isLandscape ? width * 0.2 : width * 0.15;
-  const rimeRight = isLandscape ? width * 0.2 : width * 0.15;
+  const onsetLeft = width * 0.15;
+  const rimeRight = width * 0.15;
 
   return (
     <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>

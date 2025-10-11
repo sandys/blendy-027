@@ -5,7 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
-  Dimensions,
+  useWindowDimensions,
   Platform,
 } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -15,12 +15,11 @@ import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
 import { Volume2 } from "lucide-react-native";
 
-const { width, height } = Dimensions.get("window");
-
 type BuildStage = "initial" | "first-blend" | "final-blend" | "complete";
 
 export default function WordBuilderScreen() {
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
@@ -446,8 +445,8 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   letterTile: {
-    width: Math.min(height * 0.18, 120),
-    height: Math.min(height * 0.18, 120),
+    width: 110,
+    height: 110,
     borderRadius: 20,
     backgroundColor: "#2196F3",
     justifyContent: "center",
@@ -501,8 +500,8 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   mergedTile: {
-    width: Math.min(height * 0.25, 160),
-    height: Math.min(height * 0.18, 120),
+    width: 150,
+    height: 110,
     borderRadius: 20,
     backgroundColor: "#FF6B9D",
     justifyContent: "center",

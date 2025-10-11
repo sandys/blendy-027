@@ -5,7 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
-  Dimensions,
+  useWindowDimensions,
   Platform,
 } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -15,10 +15,9 @@ import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
 import { Volume2 } from "lucide-react-native";
 
-const { width, height } = Dimensions.get("window");
-
 export default function SyllableSquishScreen() {
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
@@ -385,9 +384,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   progressSegment: {
-    width: Math.min((height - 100) / 5, 60),
-    height: Math.min((height - 100) / 5, 60),
-    borderRadius: Math.min((height - 100) / 10, 30),
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: "#FFB84D",
   },
   buttonContainer: {
@@ -395,9 +394,9 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   squishButton: {
-    width: Math.min(height * 0.35, 200),
-    height: Math.min(height * 0.35, 200),
-    borderRadius: Math.min(height * 0.175, 100),
+    width: 180,
+    height: 180,
+    borderRadius: 90,
     backgroundColor: "#FFB84D",
     justifyContent: "center",
     alignItems: "center",
