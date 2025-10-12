@@ -51,6 +51,8 @@ export default function SoundSlideScreen() {
   const onsetY = useSharedValue<number>(0);
   const onsetScale = useSharedValue<number>(1);
   const rimeScale = useSharedValue<number>(1);
+  const rimeX = useSharedValue<number>(0);
+  const rimeY = useSharedValue<number>(0);
   const flash = useSharedValue<number>(0);
 
   const gameLayout = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -63,6 +65,11 @@ export default function SoundSlideScreen() {
 
   useEffect(() => {
     engineRef.current = Engine.create();
+    if (engineRef.current) {
+      (engineRef.current.world.gravity as any).x = 0;
+      (engineRef.current.world.gravity as any).y = 0;
+      (engineRef.current.world.gravity as any).scale = 0;
+    }
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       engineRef.current = null;
@@ -110,8 +117,13 @@ export default function SoundSlideScreen() {
       if (!engineRef.current || !onsetBodyRef.current) return;
       Engine.update(engineRef.current, 16);
       const ob = onsetBodyRef.current as any;
+      const rb = rimeBodyRef.current as any;
       onsetX.value = ob?.position?.x ?? onsetX.value;
       onsetY.value = ob?.position?.y ?? onsetY.value;
+      if (rb?.position) {
+        rimeX.value = rb.position.x;
+        rimeY.value = rb.position.y;
+      }
       rafRef.current = requestAnimationFrame(loop);
     };
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -140,6 +152,8 @@ export default function SoundSlideScreen() {
     }
     onsetX.value = cxLeft;
     onsetY.value = cy;
+    rimeX.value = cxRight;
+    rimeY.value = cy;
     startEngineLoop();
   };
 
@@ -243,8 +257,12 @@ export default function SoundSlideScreen() {
     width: tileSize,
     height: tileSize,
     borderRadius: tileSize * 0.2,
-    transform: [{ scale: rimeScale.value }],
-  }), [tileSize, rimeScale]);
+    transform: [
+      { translateX: rimeX.value - tileSize / 2 },
+      { translateY: rimeY.value - tileSize / 2 },
+      { scale: rimeScale.value },
+    ],
+  }), [tileSize, rimeScale, rimeX, rimeY]);
 
   return (
     <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
