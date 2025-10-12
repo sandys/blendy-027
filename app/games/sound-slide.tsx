@@ -469,6 +469,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    zIndex: 10,
   },
   rimeTile: {
     backgroundColor: "#4ECDC4",
@@ -479,6 +480,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    zIndex: 10,
   },
   tilePlaying: {
     borderWidth: 4,
@@ -520,7 +522,7 @@ const styles = StyleSheet.create({
   flashOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 },
   gridToggle: { marginTop: 8, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: "#EEE" },
   gridToggleText: { color: "#333", fontWeight: "600" as const },
-  debugOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 5 },
+  debugOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
   gridColumnsRow: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, flexDirection: "row" as const, gap: 0 },
   gridCol: { flex: 1, backgroundColor: "transparent", borderLeftWidth: 1, borderColor: "rgba(0,0,0,0.08)" },
   gridRowsCol: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, justifyContent: "space-between" },
