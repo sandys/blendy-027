@@ -396,7 +396,16 @@ export default function SoundSlideScreen() {
           <Pressable testID="toggle-grid" accessibilityRole="button" onPress={() => setShowDebugGrid((v) => !v)} style={styles.gridToggle} hitSlop={8}>
             <Text style={styles.gridToggleText}>{showDebugGrid ? "Hide grid" : "Show grid"}</Text>
           </Pressable>
-          <Pressable testID="toggle-numbers" accessibilityRole="button" onPress={() => setShowDebugNumbers((v) => !v)} style={[styles.gridToggle, { marginLeft: 8 }]} hitSlop={8}>
+          <Pressable testID="toggle-numbers" accessibilityRole="button" onPress={() => {
+            setShowDebugNumbers((v) => {
+              const next = !v;
+              if (next && !showDebugGrid) {
+                console.log('[SoundSlide] enabling grid because numbers were turned on');
+                setShowDebugGrid(true);
+              }
+              return next;
+            });
+          }} style={[styles.gridToggle, { marginLeft: 8 }]} hitSlop={8}>
             <Text style={styles.gridToggleText}>{showDebugNumbers ? "Hide numbers" : "Show numbers"}</Text>
           </Pressable>
           <Pressable testID="toggle-layout" accessibilityRole="button" onPress={() => setUseFlexLayout((v) => !v)} style={[styles.gridToggle, { marginLeft: 8 }]} hitSlop={8}>
