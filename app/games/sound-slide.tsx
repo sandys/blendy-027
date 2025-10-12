@@ -43,6 +43,8 @@ export default function SoundSlideScreen() {
   const rimeScale = useRef(new Animated.Value(1)).current;
   const onsetLayoutRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const rimeLayoutRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const rimeZoneLayout = useRef<{ pageX: number; pageY: number; width: number; height: number } | null>(null);
+  const rimeRef = useRef<View | null>(null);
 
   useEffect(() => {
     if (!exerciseData) return;
@@ -57,6 +59,8 @@ export default function SoundSlideScreen() {
     onsetPosition.setValue({ x: 0, y: 0 });
     onsetScale.setValue(1);
     rimeScale.setValue(1);
+
+    rimeZoneLayout.current = null;
 
     const playInitialFeedback = async () => {
       Animated.sequence([
@@ -114,7 +118,7 @@ export default function SoundSlideScreen() {
         }
         Animated.spring(onsetScale, {
           toValue: 1.1,
-          useNativeDriver: true,
+          useNativeDriver: false,
         }).start();
       },
       onPanResponderMove: (evt, gestureState) => {
@@ -131,45 +135,36 @@ export default function SoundSlideScreen() {
           Animated.parallel([
             Animated.spring(onsetPosition, {
               toValue: { x: 0, y: 0 },
-              useNativeDriver: true,
+              useNativeDriver: false,
             }),
             Animated.spring(onsetScale, {
               toValue: 1,
-              useNativeDriver: true,
+              useNativeDriver: false,
             }),
           ]).start();
           return;
         }
         
-        const onsetCurrentX = onsetLayout.x + gestureState.dx;
-        const onsetCurrentY = onsetLayout.y + gestureState.dy;
-        
-        const onsetCenterX = onsetCurrentX + onsetLayout.width / 2;
-        const onsetCenterY = onsetCurrentY + onsetLayout.height / 2;
-        
-        const rimeCenterX = rimeLayout.x + rimeLayout.width / 2;
-        const rimeCenterY = rimeLayout.y + rimeLayout.height / 2;
-        
-        const distance = Math.sqrt(
-          Math.pow(onsetCenterX - rimeCenterX, 2) +
-            Math.pow(onsetCenterY - rimeCenterY, 2)
-        );
+        const dropZone = rimeZoneLayout.current;
+        const releasePageX = (evt?.nativeEvent as any)?.pageX ?? 0;
+        const releasePageY = (evt?.nativeEvent as any)?.pageY ?? 0;
 
-        const threshold = (onsetLayout.width + rimeLayout.width) / 3;
-        
-        console.log('[SoundSlide] Collision check:', {
-          distance,
-          threshold,
-          onsetCurrent: { x: onsetCurrentX, y: onsetCurrentY },
-          onsetCenter: { x: onsetCenterX, y: onsetCenterY },
-          rimeCenter: { x: rimeCenterX, y: rimeCenterY },
-          onsetLayout,
-          rimeLayout,
-          gestureState: { dx: gestureState.dx, dy: gestureState.dy },
-          isColliding: distance < threshold
+        let isInDropZone = false;
+        if (dropZone) {
+          isInDropZone =
+            releasePageX >= dropZone.pageX &&
+            releasePageX <= dropZone.pageX + dropZone.width &&
+            releasePageY >= dropZone.pageY &&
+            releasePageY <= dropZone.pageY + dropZone.height;
+        }
+
+        console.log('[SoundSlide] Collision check (page-based):', {
+          release: { x: releasePageX, y: releasePageY },
+          dropZone,
+          isInDropZone,
         });
 
-        if (distance < threshold) {
+        if (isInDropZone) {
           isCorrectAnswerGiven.current = true;
           audioLoopRef.current = false;
           setIsPlayingOnset(false);
@@ -185,22 +180,22 @@ export default function SoundSlideScreen() {
           Animated.parallel([
             Animated.spring(onsetPosition, {
               toValue: { x: width * 0.25, y: 0 },
-              useNativeDriver: true,
+              useNativeDriver: false,
             }),
             Animated.spring(onsetScale, {
               toValue: 1,
-              useNativeDriver: true,
+              useNativeDriver: false,
             }),
             Animated.sequence([
               Animated.timing(rimeScale, {
                 toValue: 1.1,
                 duration: 200,
-                useNativeDriver: true,
+                useNativeDriver: false,
               }),
               Animated.timing(rimeScale, {
                 toValue: 1,
                 duration: 200,
-                useNativeDriver: true,
+                useNativeDriver: false,
               }),
             ]),
           ]).start(() => {
@@ -229,11 +224,11 @@ export default function SoundSlideScreen() {
           Animated.parallel([
             Animated.spring(onsetPosition, {
               toValue: { x: 0, y: 0 },
-              useNativeDriver: true,
+              useNativeDriver: false,
             }),
             Animated.spring(onsetScale, {
               toValue: 1,
-              useNativeDriver: true,
+              useNativeDriver: false,
             }),
           ]).start();
         }
@@ -331,10 +326,18 @@ export default function SoundSlideScreen() {
                       transform: [{ scale: rimeScale }],
                     },
                   ]}
-                  onLayout={(event) => {
-                    const { x, y, width: w, height: h } = event.nativeEvent.layout;
-                    rimeLayoutRef.current = { x, y, width: w, height: h };
-                    console.log('[SoundSlide] Rime layout (onLayout):', { x, y, width: w, height: h });
+                  ref={(r) => {
+                    rimeRef.current = r;
+                  }}
+                  onLayout={() => {
+                    try {
+                      rimeRef.current?.measureInWindow((pageX, pageY, width, height) => {
+                        rimeZoneLayout.current = { pageX, pageY, width, height };
+                        console.log('[SoundSlide] Rime drop zone layout (absolute):', rimeZoneLayout.current);
+                      });
+                    } catch (e) {
+                      console.log('[SoundSlide] measureInWindow error', e);
+                    }
                   }}
                 >
                   <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.rime}</Text>
