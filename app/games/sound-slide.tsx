@@ -45,6 +45,7 @@ export default function SoundSlideScreen() {
   const rimeLayoutRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const rimeZoneLayout = useRef<{ pageX: number; pageY: number; width: number; height: number } | null>(null);
   const rimeRef = useRef<View | null>(null);
+  const onsetRef = useRef<View | null>(null);
 
   useEffect(() => {
     if (!exerciseData) return;
@@ -149,22 +150,61 @@ export default function SoundSlideScreen() {
         const releasePageX = (evt?.nativeEvent as any)?.pageX ?? 0;
         const releasePageY = (evt?.nativeEvent as any)?.pageY ?? 0;
 
-        let isInDropZone = false;
-        if (dropZone) {
-          isInDropZone =
-            releasePageX >= dropZone.pageX &&
-            releasePageX <= dropZone.pageX + dropZone.width &&
-            releasePageY >= dropZone.pageY &&
-            releasePageY <= dropZone.pageY + dropZone.height;
-        }
+        const decideWithRects = (
+          onsetRect?: { x: number; y: number; width: number; height: number },
+          rimeRect?: { x: number; y: number; width: number; height: number }
+        ) => {
+          let isOverlap = false;
+          if (onsetRect && rimeRect) {
+            const overlapX = onsetRect.x < rimeRect.x + rimeRect.width && onsetRect.x + onsetRect.width > rimeRect.x;
+            const overlapY = onsetRect.y < rimeRect.y + rimeRect.height && onsetRect.y + onsetRect.height > rimeRect.y;
+            isOverlap = overlapX && overlapY;
+          } else if (dropZone) {
+            isOverlap =
+              releasePageX >= dropZone.pageX &&
+              releasePageX <= dropZone.pageX + dropZone.width &&
+              releasePageY >= dropZone.pageY &&
+              releasePageY <= dropZone.pageY + dropZone.height;
+          }
 
-        console.log('[SoundSlide] Collision check (page-based):', {
-          release: { x: releasePageX, y: releasePageY },
-          dropZone,
-          isInDropZone,
-        });
+          console.log('[SoundSlide] Collision check:', {
+            method: onsetRect && rimeRect ? 'rect-overlap' : 'pointer-in-zone',
+            release: { x: releasePageX, y: releasePageY },
+            onsetRect,
+            rimeRect,
+            dropZone,
+            isOverlap,
+          });
 
-        if (isInDropZone) {
+          return isOverlap;
+        };
+
+        const attemptCollisionDecision = () => {
+          try {
+            rimeRef.current?.measureInWindow((rx, ry, rw, rh) => {
+              const rimeRect = { x: rx, y: ry, width: rw, height: rh };
+              onsetRef.current?.measureInWindow((ox, oy, ow, oh) => {
+                const onsetRect = { x: ox, y: oy, width: ow, height: oh };
+                const isInDropZone = decideWithRects(onsetRect, rimeRect);
+                if (isInDropZone) {
+                  handleSuccess();
+                } else {
+                  resetOnset();
+                }
+              });
+            });
+          } catch (e) {
+            console.log('[SoundSlide] measureInWindow error during release', e);
+            const isInDropZone = decideWithRects();
+            if (isInDropZone) {
+              handleSuccess();
+            } else {
+              resetOnset();
+            }
+          }
+        };
+
+        const handleSuccess = () => {
           isCorrectAnswerGiven.current = true;
           audioLoopRef.current = false;
           setIsPlayingOnset(false);
@@ -216,7 +256,9 @@ export default function SoundSlideScreen() {
               }
             }, 3000);
           });
-        } else {
+        };
+
+        const resetOnset = () => {
           if (Platform.OS !== "web") {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           }
@@ -231,7 +273,9 @@ export default function SoundSlideScreen() {
               useNativeDriver: false,
             }),
           ]).start();
-        }
+        };
+
+        attemptCollisionDecision();
       },
     })
   ).current;
@@ -294,6 +338,7 @@ export default function SoundSlideScreen() {
                     },
                   ]}
                   testID="onset-tile"
+                  ref={(v: View | null) => { onsetRef.current = v; }}
                   {...panResponder.panHandlers}
                   onLayout={(event) => {
                     const { x, y, width: w, height: h } = event.nativeEvent.layout;
@@ -331,9 +376,12 @@ export default function SoundSlideScreen() {
                   }}
                   onLayout={() => {
                     try {
-                      rimeRef.current?.measureInWindow((pageX, pageY, width, height) => {
-                        rimeZoneLayout.current = { pageX, pageY, width, height };
-                        console.log('[SoundSlide] Rime drop zone layout (absolute):', rimeZoneLayout.current);
+                      // Delay measure to ensure layout is committed on web
+                      requestAnimationFrame(() => {
+                        rimeRef.current?.measureInWindow((pageX, pageY, width, height) => {
+                          rimeZoneLayout.current = { pageX, pageY, width, height };
+                          console.log('[SoundSlide] Rime drop zone layout (absolute):', rimeZoneLayout.current);
+                        });
                       });
                     } catch (e) {
                       console.log('[SoundSlide] measureInWindow error', e);
