@@ -152,18 +152,16 @@ export default function SoundSlideScreen() {
   };
 
   const computeCentersNorm = (gl: { width: number; height: number }) => {
-    const marginPx = Math.max(12, tileSize * 0.25);
-    const spacingTarget = gl.width * (isLandscape ? 0.30 : 0.26);
-    const maxSpacing = Math.max(
-      tileSize * 1.0,
-      Math.min(spacingTarget, gl.width - 2 * marginPx - tileSize)
-    );
-    const cxLeftPx = gl.width / 2 - maxSpacing / 2;
-    const cxRightPx = gl.width / 2 + maxSpacing / 2;
-    const cyPx = gl.height * 0.5;
-    const cxLeft = Math.max(marginPx + tileSize / 2, cxLeftPx) / gl.width;
-    const cxRight = Math.min(gl.width - marginPx - tileSize / 2, cxRightPx) / gl.width;
+    const marginPx = Math.max(12, Math.round(tileSize * 0.25));
+    const usableW = gl.width - marginPx * 2 - tileSize; // space between centers after accounting for both half widths
+    const spacingTarget = Math.max(tileSize * 1.1, Math.min(usableW, gl.width * (isLandscape ? 0.28 : 0.24)));
+    const cxLeftPx = Math.max(marginPx + tileSize / 2, Math.round(gl.width / 2 - spacingTarget / 2));
+    const cxRightPx = Math.min(gl.width - marginPx - tileSize / 2, Math.round(gl.width / 2 + spacingTarget / 2));
+    const cyPx = Math.round(gl.height * 0.5);
+    const cxLeft = cxLeftPx / gl.width;
+    const cxRight = cxRightPx / gl.width;
     const cy = cyPx / gl.height;
+    console.log('[SoundSlide] centers', { marginPx, spacingTarget, cxLeftPx, cxRightPx, cyPx, gl });
     return { cxLeft, cxRight, cy };
   };
 
@@ -194,6 +192,12 @@ export default function SoundSlideScreen() {
     onsetBodyRef.current = Bodies.rectangle(onsetXpx, onsetYpx, tileSize, tileSize, { label: "onset", isStatic: false });
     rimeBodyRef.current = Bodies.rectangle(rimeXpx, rimeYpx, tileSize, tileSize, { label: "rime", isStatic: true });
     Composite.add(eng.world, [onsetBodyRef.current, rimeBodyRef.current]);
+    console.log('[SoundSlide] layoutBodies', {
+      tileSize,
+      onset: { x: onsetXpx, y: onsetYpx },
+      rime: { x: rimeXpx, y: rimeYpx },
+      sizeNorm: sizeNormRef.current,
+    });
 
     onsetX.value = onsetXpx;
     onsetY.value = onsetYpx;
@@ -211,7 +215,11 @@ export default function SoundSlideScreen() {
         const ob = onsetBodyRef.current;
         if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onsetScale.value = withSpring(1.08);
-        if (ob) dragStartCenter.current = { x: (ob as any).position?.x ?? 0, y: (ob as any).position?.y ?? 0 };
+        if (ob) {
+          const pos = (ob as any).position;
+          dragStartCenter.current = { x: pos?.x ?? 0, y: pos?.y ?? 0 };
+          console.log('[SoundSlide] drag start', dragStartCenter.current);
+        }
       },
       onPanResponderMove: (_evt, g) => {
         const ob = onsetBodyRef.current;
@@ -236,6 +244,7 @@ export default function SoundSlideScreen() {
           const hovering = !!(result && result.collided === true);
           rimeScale.value = withTiming(hovering ? 1.06 : 1, { duration: 120 });
         }
+        if (__DEV__) console.log('[SoundSlide] drag move', { nx, ny });
       },
       onPanResponderRelease: () => {
         const ob = onsetBodyRef.current;
@@ -247,6 +256,7 @@ export default function SoundSlideScreen() {
         Engine.update(eng, 16);
         const result = SAT.collides(ob as any, rb as any) as { collided?: boolean } | null;
         const hit = !!(result && result.collided === true);
+        console.log('[SoundSlide] release', { hit, onset: (ob as any).position, rime: (rb as any).position });
         if (hit) {
           runOnJS(handleSuccess)();
         } else {
@@ -348,6 +358,7 @@ export default function SoundSlideScreen() {
         ref={gameAreaRef}
         onLayout={(e: LayoutChangeEvent) => {
           const { x, y, width: w, height: h } = e.nativeEvent.layout;
+          console.log('[SoundSlide] onLayout', { x, y, w, h });
           gameLayout.current = { x, y, width: w, height: h };
           layoutBodies({ x, y, width: w, height: h });
         }}
@@ -406,7 +417,7 @@ const styles = StyleSheet.create({
   header: { paddingVertical: 12, paddingHorizontal: 20, alignItems: "center" },
   instructionText: { fontWeight: "700" as const, color: "#FFD93D", textAlign: "center", marginBottom: 8 },
   progressText: { color: "#999", fontWeight: "600" as const },
-  gameArea: { flex: 1, justifyContent: "center", alignItems: "center" },
+  gameArea: { flex: 1, justifyContent: "center", alignItems: "center", position: "relative" as const },
   onsetTile: {
     backgroundColor: "#FF6B9D",
     justifyContent: "center",
