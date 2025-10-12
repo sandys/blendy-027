@@ -61,7 +61,7 @@ export default function SoundSlideScreen() {
   const isCorrectAnswerGiven = useRef<boolean>(false);
 
   const tileSize = useMemo(() => (isLandscape ? 96 : 128), [isLandscape]);
-  const spacing = useMemo(() => (isLandscape ? Math.max(120, width * 0.18) : Math.max(80, width * 0.12)), [isLandscape, width]);
+  const desiredSpacing = useMemo(() => (isLandscape ? Math.max(120, width * 0.18) : Math.max(80, width * 0.12)), [isLandscape, width]);
 
   useEffect(() => {
     engineRef.current = Engine.create();
@@ -130,12 +130,22 @@ export default function SoundSlideScreen() {
     rafRef.current = requestAnimationFrame(loop);
   };
 
+  const computeCenters = (gl: { width: number; height: number }) => {
+    const margin = Math.max(12, tileSize * 0.25);
+    const maxSpacing = Math.max(
+      tileSize * 1.2,
+      Math.min(desiredSpacing, gl.width - 2 * margin - tileSize)
+    );
+    const cxLeft = gl.width / 2 - maxSpacing / 2;
+    const cxRight = gl.width / 2 + maxSpacing / 2;
+    const cy = gl.height * 0.5;
+    return { cxLeft: Math.max(margin + tileSize / 2, cxLeft), cxRight: Math.min(gl.width - margin - tileSize / 2, cxRight), cy };
+  };
+
   const layoutBodies = (gl: { x: number; y: number; width: number; height: number }) => {
     const eng = engineRef.current;
     if (!eng) return;
-    const cxLeft = gl.width * 0.35 - spacing * 0.25;
-    const cxRight = gl.width * 0.65 + spacing * 0.25;
-    const cy = gl.height * 0.5;
+    const { cxLeft, cxRight, cy } = computeCenters(gl);
     if (!onsetBodyRef.current) {
       onsetBodyRef.current = Bodies.rectangle(cxLeft, cy, tileSize, tileSize, { label: "onset", isStatic: false });
       Composite.add(eng.world, onsetBodyRef.current);
@@ -172,8 +182,16 @@ export default function SoundSlideScreen() {
         const rb = rimeBodyRef.current;
         const eng = engineRef.current;
         if (!ob || !eng) return;
-        const nx = dragStartCenter.current.x + g.dx;
-        const ny = dragStartCenter.current.y + g.dy;
+        const gl = gameLayout.current;
+        const margin = Math.max(12, tileSize * 0.25);
+        const minX = (gl?.x ?? 0) + margin + tileSize / 2;
+        const maxX = (gl ? gl.x + gl.width : width) - margin - tileSize / 2;
+        const minY = (gl?.y ?? 0) + margin + tileSize / 2;
+        const maxY = (gl ? gl.y + gl.height : height) - margin - tileSize / 2;
+        let nx = dragStartCenter.current.x + g.dx;
+        let ny = dragStartCenter.current.y + g.dy;
+        nx = Math.max(minX, Math.min(maxX, nx));
+        ny = Math.max(minY, Math.min(maxY, ny));
         Body.setPosition(ob, { x: nx, y: ny });
         Engine.update(eng, 16);
         if (rb) {
@@ -196,8 +214,7 @@ export default function SoundSlideScreen() {
         } else {
           const gl = gameLayout.current;
           if (gl) {
-            const cxLeft = gl.width * 0.35 - spacing * 0.25;
-            const cy = gl.height * 0.5;
+            const { cxLeft, cy } = computeCenters(gl);
             Body.setPosition(ob, { x: cxLeft, y: cy });
             onsetX.value = withSpring(cxLeft);
             onsetY.value = withSpring(cy);
