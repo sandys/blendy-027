@@ -150,43 +150,39 @@ export default function SoundSlideScreen() {
         const releasePageX = (evt?.nativeEvent as any)?.pageX ?? 0;
         const releasePageY = (evt?.nativeEvent as any)?.pageY ?? 0;
 
-        const decideWithRects = (
-          onsetRect?: { x: number; y: number; width: number; height: number },
-          rimeRect?: { x: number; y: number; width: number; height: number }
-        ) => {
-          let isOverlap = false;
-          if (onsetRect && rimeRect) {
-            const overlapX = onsetRect.x < rimeRect.x + rimeRect.width && onsetRect.x + onsetRect.width > rimeRect.x;
-            const overlapY = onsetRect.y < rimeRect.y + rimeRect.height && onsetRect.y + onsetRect.height > rimeRect.y;
-            isOverlap = overlapX && overlapY;
-          } else if (dropZone) {
-            isOverlap =
-              releasePageX >= dropZone.pageX &&
-              releasePageX <= dropZone.pageX + dropZone.width &&
-              releasePageY >= dropZone.pageY &&
-              releasePageY <= dropZone.pageY + dropZone.height;
-          }
-
-          console.log('[SoundSlide] Collision check:', {
-            method: onsetRect && rimeRect ? 'rect-overlap' : 'pointer-in-zone',
+        const pointerInsideDropZone = (zone: { pageX: number; pageY: number; width: number; height: number } | null) => {
+          if (!zone) return false;
+          const inside =
+            releasePageX >= zone.pageX &&
+            releasePageX <= zone.pageX + zone.width &&
+            releasePageY >= zone.pageY &&
+            releasePageY <= zone.pageY + zone.height;
+          console.log('[SoundSlide] Pointer collision check', {
             release: { x: releasePageX, y: releasePageY },
-            onsetRect,
-            rimeRect,
-            dropZone,
-            isOverlap,
+            zone,
+            inside,
           });
-
-          return isOverlap;
+          return inside;
         };
 
         const attemptCollisionDecision = () => {
+          if (pointerInsideDropZone(dropZone)) {
+            handleSuccess();
+            return;
+          }
+
           try {
             rimeRef.current?.measureInWindow((rx, ry, rw, rh) => {
               const rimeRect = { x: rx, y: ry, width: rw, height: rh };
               onsetRef.current?.measureInWindow((ox, oy, ow, oh) => {
-                const onsetRect = { x: ox, y: oy, width: ow, height: oh };
-                const isInDropZone = decideWithRects(onsetRect, rimeRect);
-                if (isInDropZone) {
+                // IMPORTANT: measureInWindow doesn't include transform
+                // So we approximate by shifting by the last drag delta
+                const onsetRect = { x: ox + (gestureState.dx ?? 0), y: oy + (gestureState.dy ?? 0), width: ow, height: oh };
+                const overlapX = onsetRect.x < rimeRect.x + rimeRect.width && onsetRect.x + onsetRect.width > rimeRect.x;
+                const overlapY = onsetRect.y < rimeRect.y + rimeRect.height && onsetRect.y + onsetRect.height > rimeRect.y;
+                const isOverlap = overlapX && overlapY;
+                console.log('[SoundSlide] Rect collision check', { onsetRect, rimeRect, isOverlap });
+                if (isOverlap) {
                   handleSuccess();
                 } else {
                   resetOnset();
@@ -195,8 +191,7 @@ export default function SoundSlideScreen() {
             });
           } catch (e) {
             console.log('[SoundSlide] measureInWindow error during release', e);
-            const isInDropZone = decideWithRects();
-            if (isInDropZone) {
+            if (pointerInsideDropZone(dropZone)) {
               handleSuccess();
             } else {
               resetOnset();
