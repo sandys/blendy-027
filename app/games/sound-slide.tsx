@@ -193,7 +193,6 @@ export default function SoundSlideScreen() {
 
   const layoutBodies = (gl: { x: number; y: number; width: number; height: number }) => {
     const eng = engineRef.current;
-    if (!eng) return;
 
     sizeNormRef.current = { w: tileSize / gl.width, h: tileSize / gl.height };
 
@@ -206,31 +205,37 @@ export default function SoundSlideScreen() {
     const rimeXpx = rimeNormRef.current.x * gl.width;
     const rimeYpx = rimeNormRef.current.y * gl.height;
 
-    if (onsetBodyRef.current) {
-      Composite.remove(eng.world, onsetBodyRef.current);
+    if (!useFlexLayout && eng) {
+      if (onsetBodyRef.current) {
+        Composite.remove(eng.world, onsetBodyRef.current);
+        onsetBodyRef.current = null;
+      }
+      if (rimeBodyRef.current) {
+        Composite.remove(eng.world, rimeBodyRef.current);
+        rimeBodyRef.current = null;
+      }
+
+      onsetBodyRef.current = Bodies.rectangle(onsetXpx, onsetYpx, tileSize, tileSize, { label: "onset", isStatic: false });
+      rimeBodyRef.current = Bodies.rectangle(rimeXpx, rimeYpx, tileSize, tileSize, { label: "rime", isStatic: true });
+      Composite.add(eng.world, [onsetBodyRef.current, rimeBodyRef.current]);
+      startEngineLoop();
+    } else {
       onsetBodyRef.current = null;
-    }
-    if (rimeBodyRef.current) {
-      Composite.remove(eng.world, rimeBodyRef.current);
       rimeBodyRef.current = null;
     }
 
-    onsetBodyRef.current = Bodies.rectangle(onsetXpx, onsetYpx, tileSize, tileSize, { label: "onset", isStatic: false });
-    rimeBodyRef.current = Bodies.rectangle(rimeXpx, rimeYpx, tileSize, tileSize, { label: "rime", isStatic: true });
-    Composite.add(eng.world, [onsetBodyRef.current, rimeBodyRef.current]);
     console.log('[SoundSlide] layoutBodies', {
       tileSize,
       onset: { x: onsetXpx, y: onsetYpx },
       rime: { x: rimeXpx, y: rimeYpx },
       sizeNorm: sizeNormRef.current,
+      mode: useFlexLayout ? 'flex' : 'absolute',
     });
 
     onsetX.value = onsetXpx;
     onsetY.value = onsetYpx;
     rimeX.value = rimeXpx;
     rimeY.value = rimeYpx;
-
-    startEngineLoop();
   };
 
   const panResponder = useRef(
@@ -238,21 +243,19 @@ export default function SoundSlideScreen() {
       onStartShouldSetPanResponder: () => stage === "initial" && !!gameLayout.current,
       onMoveShouldSetPanResponder: () => stage === "initial" && !!gameLayout.current,
       onPanResponderGrant: () => {
-        const ob = onsetBodyRef.current;
         if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onsetScale.value = withSpring(1.08);
-        if (ob) {
-          const pos = (ob as any).position;
+        if (onsetBodyRef.current) {
+          const pos = (onsetBodyRef.current as any).position;
           dragStartCenter.current = { x: pos?.x ?? 0, y: pos?.y ?? 0 };
-          console.log('[SoundSlide] drag start', dragStartCenter.current);
+        } else {
+          dragStartCenter.current = { x: onsetX.value, y: onsetY.value };
         }
+        console.log('[SoundSlide] drag start', { start: dragStartCenter.current, mode: useFlexLayout ? 'flex' : 'absolute' });
       },
       onPanResponderMove: (_evt, g) => {
-        const ob = onsetBodyRef.current;
-        const rb = rimeBodyRef.current;
-        const eng = engineRef.current;
         const gl = gameLayout.current;
-        if (!ob || !eng || !gl) return;
+        if (!gl) return;
         const marginPx = Math.max(12, tileSize * 0.25);
         const minX = marginPx + tileSize / 2;
         const maxX = gl.width - marginPx - tileSize / 2;
@@ -262,27 +265,42 @@ export default function SoundSlideScreen() {
         let ny = dragStartCenter.current.y + g.dy;
         nx = Math.max(minX, Math.min(maxX, nx));
         ny = Math.max(minY, Math.min(maxY, ny));
-        Body.setPosition(ob, { x: nx, y: ny });
-        onsetNormRef.current = { x: nx / gl.width, y: ny / gl.height };
-        Engine.update(eng, 16);
-        if (rb) {
-          const result = SAT.collides(ob as any, rb as any) as { collided?: boolean } | null;
-          const hovering = !!(result && result.collided === true);
+
+        if (onsetBodyRef.current && !useFlexLayout && engineRef.current) {
+          Body.setPosition(onsetBodyRef.current, { x: nx, y: ny });
+          onsetNormRef.current = { x: nx / gl.width, y: ny / gl.height };
+          Engine.update(engineRef.current, 16);
+          if (rimeBodyRef.current) {
+            const result = SAT.collides(onsetBodyRef.current as any, rimeBodyRef.current as any) as { collided?: boolean } | null;
+            const hovering = !!(result && result.collided === true);
+            rimeScale.value = withTiming(hovering ? 1.06 : 1, { duration: 120 });
+          }
+        } else {
+          onsetX.value = nx;
+          onsetY.value = ny;
+          onsetNormRef.current = { x: nx / gl.width, y: ny / gl.height };
+          const hovering = Math.abs(nx - rimeX.value) <= tileSize * 0.5 && Math.abs(ny - rimeY.value) <= tileSize * 0.5;
           rimeScale.value = withTiming(hovering ? 1.06 : 1, { duration: 120 });
         }
         if (__DEV__) console.log('[SoundSlide] drag move', { nx, ny });
       },
       onPanResponderRelease: () => {
-        const ob = onsetBodyRef.current;
-        const rb = rimeBodyRef.current;
-        const eng = engineRef.current;
         const gl = gameLayout.current;
         onsetScale.value = withSpring(1);
-        if (!ob || !rb || !eng || !gl) return;
-        Engine.update(eng, 16);
-        const result = SAT.collides(ob as any, rb as any) as { collided?: boolean } | null;
-        const hit = !!(result && result.collided === true);
-        console.log('[SoundSlide] release', { hit, onset: (ob as any).position, rime: (rb as any).position });
+        if (!gl) return;
+
+        let hit = false;
+        if (onsetBodyRef.current && rimeBodyRef.current && engineRef.current && !useFlexLayout) {
+          Engine.update(engineRef.current, 16);
+          const result = SAT.collides(onsetBodyRef.current as any, rimeBodyRef.current as any) as { collided?: boolean } | null;
+          hit = !!(result && result.collided === true);
+          console.log('[SoundSlide] release(abs)', { hit });
+        } else {
+          const hovering = Math.abs(onsetX.value - rimeX.value) <= tileSize * 0.5 && Math.abs(onsetY.value - rimeY.value) <= tileSize * 0.5;
+          hit = hovering;
+          console.log('[SoundSlide] release(flex)', { hit });
+        }
+
         if (hit) {
           runOnJS(handleSuccess)();
         } else {
@@ -290,7 +308,9 @@ export default function SoundSlideScreen() {
           onsetNormRef.current = { x: centers.cxLeft, y: centers.cy };
           const cx = onsetNormRef.current.x * gl.width;
           const cy = onsetNormRef.current.y * gl.height;
-          Body.setPosition(ob, { x: cx, y: cy });
+          if (onsetBodyRef.current && !useFlexLayout) {
+            Body.setPosition(onsetBodyRef.current, { x: cx, y: cy });
+          }
           onsetX.value = withSpring(cx);
           onsetY.value = withSpring(cy);
           rimeScale.value = withTiming(1, { duration: 120 });
@@ -306,7 +326,7 @@ export default function SoundSlideScreen() {
     if (gameLayout.current) {
       layoutBodies(gameLayout.current);
     }
-  }, [width, height, isLandscape, tileSize, stage]);
+  }, [width, height, isLandscape, tileSize, stage, useFlexLayout]);
 
   const handleSuccess = () => {
     isCorrectAnswerGiven.current = true;
@@ -390,7 +410,7 @@ export default function SoundSlideScreen() {
             console.log('[SoundSlide] onLayout(board)', { x, y, w, h });
             if (w <= 0 || h <= 0) return;
             gameLayout.current = { x, y, width: w, height: h };
-            if (!useFlexLayout) layoutBodies({ x, y, width: w, height: h });
+            layoutBodies({ x, y, width: w, height: h });
           }}
         >
           <Animated.View style={[styles.flashOverlay, flashAnimatedStyle]} pointerEvents="none" testID="flash-overlay" />
@@ -441,12 +461,27 @@ export default function SoundSlideScreen() {
 
           {stage === "initial" && useFlexLayout && (
             <View style={[styles.flexRow, { gap: Math.max(8, tileSize * 0.25) }]} testID="flex-layout">
-              <View style={[styles.onsetTile, { width: tileSize, height: tileSize, borderRadius: tileSize * 0.2, justifyContent: 'center', alignItems: 'center' }]}>
+              <Animated.View
+                testID="onset-tile-flex"
+                style={[
+                  styles.onsetTile,
+                  { width: tileSize, height: tileSize, borderRadius: tileSize * 0.2, justifyContent: 'center', alignItems: 'center' },
+                  onsetAnimatedStyle,
+                ]}
+                {...panResponder.panHandlers}
+              >
                 <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.onset}</Text>
-              </View>
-              <View style={[styles.rimeTile, { width: tileSize, height: tileSize, borderRadius: tileSize * 0.2, justifyContent: 'center', alignItems: 'center' }]}>
+              </Animated.View>
+              <Animated.View
+                testID="rime-tile-flex"
+                style={[
+                  styles.rimeTile,
+                  { width: tileSize, height: tileSize, borderRadius: tileSize * 0.2, justifyContent: 'center', alignItems: 'center' },
+                  rimeAnimatedStyle,
+                ]}
+              >
                 <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.rime}</Text>
-              </View>
+              </Animated.View>
             </View>
           )}
 
