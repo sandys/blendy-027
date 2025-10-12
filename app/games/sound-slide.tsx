@@ -21,7 +21,7 @@ import { useLocalSearchParams, router } from "expo-router";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
 import { Volume2 } from "lucide-react-native";
-import Matter, { Bodies, Body, Engine, SAT, Composite } from "matter-js";
+import { Bodies, Body, Engine, SAT, Composite } from "matter-js";
 
 export default function SoundSlideScreen() {
   const insets = useSafeAreaInsets();
@@ -58,9 +58,9 @@ export default function SoundSlideScreen() {
   const onsetRef = useRef<View>(null);
   const lastDragRef = useRef<{ dx: number; dy: number; pageX: number; pageY: number }>({ dx: 0, dy: 0, pageX: 0, pageY: 0 });
 
-  const engineRef = useRef<Engine | null>(null);
-  const onsetBodyRef = useRef<Matter.Body | null>(null);
-  const rimeBodyRef = useRef<Matter.Body | null>(null);
+  const engineRef = useRef<any | null>(null);
+  const onsetBodyRef = useRef<any | null>(null);
+  const rimeBodyRef = useRef<any | null>(null);
 
   useEffect(() => {
     if (!exerciseData) return;
@@ -222,7 +222,7 @@ export default function SoundSlideScreen() {
 
           const rimeBody = rimeBodyRef.current;
           if (rimeBody) {
-            const sat = SAT.collides(onsetBody as Matter.Body, rimeBody as Matter.Body);
+            const sat = SAT.collides(onsetBody as any, rimeBody as any);
             const hovering = sat.collided === true;
             rimeScale.value = withTiming(hovering ? 1.05 : 1, { duration: 120 });
           }
@@ -243,7 +243,7 @@ export default function SoundSlideScreen() {
         Body.setPosition(onsetBody, { x: baseLeft + gestureState.dx, y: baseTop + gestureState.dy });
         Engine.update(engine, 16);
 
-        const sat = SAT.collides(onsetBody as Matter.Body, rimeBody as Matter.Body);
+        const sat = SAT.collides(onsetBody as any, rimeBody as any);
         if (sat.collided) {
           runOnJS(handleSuccessJS)();
         } else {
