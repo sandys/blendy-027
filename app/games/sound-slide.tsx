@@ -153,16 +153,43 @@ export default function SoundSlideScreen() {
 
   const computeCentersNorm = (gl: { width: number; height: number }) => {
     const marginPx = Math.max(12, Math.round(tileSize * 0.25));
-    const usableW = gl.width - marginPx * 2 - tileSize; // space between centers after accounting for both half widths
-    const spacingTarget = Math.max(tileSize * 1.1, Math.min(usableW, gl.width * (isLandscape ? 0.28 : 0.24)));
-    const cxLeftPx = Math.max(marginPx + tileSize / 2, Math.round(gl.width / 2 - spacingTarget / 2));
-    const cxRightPx = Math.min(gl.width - marginPx - tileSize / 2, Math.round(gl.width / 2 + spacingTarget / 2));
-    const cyPx = Math.round(gl.height * 0.5);
-    const cxLeft = cxLeftPx / gl.width;
-    const cxRight = cxRightPx / gl.width;
-    const cy = cyPx / gl.height;
-    console.log('[SoundSlide] centers', { marginPx, spacingTarget, cxLeftPx, cxRightPx, cyPx, gl });
-    return { cxLeft, cxRight, cy };
+    const half = tileSize / 2;
+    const minCx = (marginPx + half) / gl.width;
+    const maxCx = (gl.width - marginPx - half) / gl.width;
+
+    // Start from ideal normalized anchors and then clamp to ensure full visibility
+    const idealLeft = 0.35;
+    const idealRight = 0.65;
+
+    const cxLeft = Math.max(minCx, Math.min(maxCx, idealLeft));
+    const cxRight = Math.max(minCx, Math.min(maxCx, idealRight));
+
+    // Ensure minimum separation between centers to avoid overlap
+    const minSepPx = Math.max(tileSize * 1.1, 48);
+    const sepPx = Math.abs(cxRight * gl.width - cxLeft * gl.width);
+    if (sepPx < minSepPx) {
+      const mid = (cxLeft + cxRight) / 2;
+      const offset = (minSepPx / gl.width) / 2;
+      let newLeft = mid - offset;
+      let newRight = mid + offset;
+      newLeft = Math.max(minCx, Math.min(maxCx, newLeft));
+      newRight = Math.max(minCx, Math.min(maxCx, newRight));
+      // If clamping collapsed separation, push from whichever side has room
+      if ((newRight - newLeft) * gl.width < minSepPx) {
+        const roomLeft = (newLeft - minCx) * gl.width;
+        const roomRight = (maxCx - newRight) * gl.width;
+        const need = minSepPx - (newRight - newLeft) * gl.width;
+        if (roomLeft > roomRight) {
+          newLeft = Math.max(minCx, newLeft - need / gl.width);
+        } else {
+          newRight = Math.min(maxCx, newRight + need / gl.width);
+        }
+      }
+      console.log('[SoundSlide] adjusted separation', { before: { cxLeft, cxRight }, after: { newLeft, newRight }, minSepPx });
+      return { cxLeft: newLeft, cxRight: newRight, cy: 0.5 };
+    }
+
+    return { cxLeft, cxRight, cy: 0.5 };
   };
 
   const layoutBodies = (gl: { x: number; y: number; width: number; height: number }) => {
@@ -277,14 +304,6 @@ export default function SoundSlideScreen() {
   ).current;
 
   useEffect(() => {
-    const ox = Math.max(60, width * 0.3);
-    const rx = Math.min(width - 60, width * 0.7);
-    const cy = height * 0.55;
-    onsetX.value = ox;
-    onsetY.value = cy;
-    rimeX.value = rx;
-    rimeY.value = cy;
-
     if (gameLayout.current) {
       layoutBodies(gameLayout.current);
     }
@@ -359,6 +378,8 @@ export default function SoundSlideScreen() {
         onLayout={(e: LayoutChangeEvent) => {
           const { x, y, width: w, height: h } = e.nativeEvent.layout;
           console.log('[SoundSlide] onLayout', { x, y, w, h });
+          // Guard against transient zero sizes that can happen during rotation
+          if (w <= 0 || h <= 0) return;
           gameLayout.current = { x, y, width: w, height: h };
           layoutBodies({ x, y, width: w, height: h });
         }}
