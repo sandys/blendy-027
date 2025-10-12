@@ -367,15 +367,15 @@ export default function SoundSlideScreen() {
 
   return (
     <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <Animated.View style={[styles.flashOverlay, flashAnimatedStyle]} pointerEvents="none" />
-      <View style={styles.header} testID="header">
+
+      <View style={styles.header} testID="header" pointerEvents="auto">
         <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 14 }]}>Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}</Text>
         <Text style={[styles.instructionText, { fontSize: isLandscape ? Math.max(14, width * 0.018) : Math.max(18, width * 0.04), marginTop: 4 }]}>Drag the sounds together to make a word!</Text>
         <View style={styles.headerButtonsRow}>
-          <Pressable testID="toggle-grid" accessibilityRole="button" onPress={() => setShowDebugGrid((v) => !v)} style={styles.gridToggle}>
+          <Pressable testID="toggle-grid" accessibilityRole="button" onPress={() => setShowDebugGrid((v) => !v)} style={styles.gridToggle} hitSlop={8}>
             <Text style={styles.gridToggleText}>{showDebugGrid ? "Hide grid" : "Show grid"}</Text>
           </Pressable>
-          <Pressable testID="toggle-layout" accessibilityRole="button" onPress={() => setUseFlexLayout((v) => !v)} style={[styles.gridToggle, { marginLeft: 8 }]}>
+          <Pressable testID="toggle-layout" accessibilityRole="button" onPress={() => setUseFlexLayout((v) => !v)} style={[styles.gridToggle, { marginLeft: 8 }]} hitSlop={8}>
             <Text style={styles.gridToggleText}>{useFlexLayout ? "Absolute layout" : "Flex layout"}</Text>
           </Pressable>
         </View>
@@ -393,6 +393,7 @@ export default function SoundSlideScreen() {
             if (!useFlexLayout) layoutBodies({ x, y, width: w, height: h });
           }}
         >
+          <Animated.View style={[styles.flashOverlay, flashAnimatedStyle]} pointerEvents="none" testID="flash-overlay" />
           {showDebugGrid && (
             <View pointerEvents="none" style={styles.debugOverlay} testID="debug-grid">
               <View style={styles.gridColumnsRow}>
@@ -472,7 +473,7 @@ export default function SoundSlideScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFF8E1" },
-  header: { paddingVertical: 12, paddingHorizontal: 20, alignItems: "center" },
+  header: { paddingVertical: 12, paddingHorizontal: 20, alignItems: "center", position: 'relative', zIndex: 10, elevation: 2 },
   headerButtonsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
   instructionText: { fontWeight: "700" as const, color: "#FFD93D", textAlign: "center", marginBottom: 8 },
   progressText: { color: "#999", fontWeight: "600" as const },
