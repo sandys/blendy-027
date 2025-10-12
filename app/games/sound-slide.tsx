@@ -54,6 +54,7 @@ export default function SoundSlideScreen() {
   const onsetLayoutRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const rimeLayoutRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const rimeZoneLayout = useRef<{ pageX: number; pageY: number; width: number; height: number } | null>(null);
+  const onsetWindowLayoutRef = useRef<{ pageX: number; pageY: number; width: number; height: number } | null>(null);
   const rimeRef = useRef<View>(null);
   const onsetRef = useRef<View>(null);
   const lastDragRef = useRef<{ dx: number; dy: number; pageX: number; pageY: number }>({ dx: 0, dy: 0, pageX: 0, pageY: 0 });
@@ -79,6 +80,7 @@ export default function SoundSlideScreen() {
     rimeScale.value = 1;
 
     rimeZoneLayout.current = null;
+    onsetWindowLayoutRef.current = null;
 
     const engine = Engine.create();
     engineRef.current = engine;
@@ -215,10 +217,15 @@ export default function SoundSlideScreen() {
         const engine = engineRef.current;
         const onsetBody = onsetBodyRef.current;
         if (engine && onsetBody && onsetLayoutRef.current) {
-          const baseLeft = (onsetLayoutRef.current.x ?? 0) + (onsetLayoutRef.current.width ?? 0) / 2;
-          const baseTop = (onsetLayoutRef.current.y ?? 0) + (onsetLayoutRef.current.height ?? 0) / 2;
+          const onsetAbs = onsetWindowLayoutRef.current;
+          const baseLeft = (onsetAbs?.pageX ?? 0) + (onsetAbs?.width ?? 0) / 2;
+          const baseTop = (onsetAbs?.pageY ?? 0) + (onsetAbs?.height ?? 0) / 2;
           Body.setPosition(onsetBody, { x: baseLeft + gestureState.dx, y: baseTop + gestureState.dy });
           Engine.update(engine, 16);
+          console.log('[SoundSlide] Move positions', {
+            onsetCenter: { x: baseLeft + gestureState.dx, y: baseTop + gestureState.dy },
+            rimeCenter: rimeBodyRef.current ? { x: (rimeZoneLayout.current?.pageX ?? 0) + (rimeZoneLayout.current?.width ?? 0)/2, y: (rimeZoneLayout.current?.pageY ?? 0) + (rimeZoneLayout.current?.height ?? 0)/2 } : null,
+          });
 
           const rimeBody = rimeBodyRef.current;
           if (rimeBody) {
@@ -247,10 +254,14 @@ export default function SoundSlideScreen() {
           return;
         }
 
-        const baseLeft = (onsetLayoutRef.current.x ?? 0) + (onsetLayoutRef.current.width ?? 0) / 2;
-        const baseTop = (onsetLayoutRef.current.y ?? 0) + (onsetLayoutRef.current.height ?? 0) / 2;
+        const onsetAbs = onsetWindowLayoutRef.current;
+        const baseLeft = (onsetAbs?.pageX ?? 0) + (onsetAbs?.width ?? 0) / 2;
+        const baseTop = (onsetAbs?.pageY ?? 0) + (onsetAbs?.height ?? 0) / 2;
         Body.setPosition(onsetBody, { x: baseLeft + gestureState.dx, y: baseTop + gestureState.dy });
         Engine.update(engine, 16);
+        console.log('[SoundSlide] Release positions', {
+          onsetCenter: { x: baseLeft + gestureState.dx, y: baseTop + gestureState.dy },
+        });
 
         let didCollide = false;
         try {
@@ -337,17 +348,27 @@ export default function SoundSlideScreen() {
                   onLayout={(event) => {
                     const { x, y, width: w, height: h } = event.nativeEvent.layout;
                     onsetLayoutRef.current = { x, y, width: w, height: h };
-                    console.log('[SoundSlide] Onset layout (onLayout):', { x, y, width: w, height: h });
-                    const engine = engineRef.current;
-                    if (engine) {
-                      const cx = x + w / 2;
-                      const cy = y + h / 2;
-                      if (!onsetBodyRef.current) {
-                        onsetBodyRef.current = Bodies.rectangle(cx, cy, w, h, { isStatic: false, label: 'onset' });
-                        Composite.add(engine.world, onsetBodyRef.current);
-                      } else {
-                        Body.setPosition(onsetBodyRef.current, { x: cx, y: cy });
-                      }
+                    console.log('[SoundSlide] Onset layout (local):', { x, y, width: w, height: h });
+                    try {
+                      requestAnimationFrame(() => {
+                        onsetRef.current?.measureInWindow((pageX, pageY, mw, mh) => {
+                          onsetWindowLayoutRef.current = { pageX, pageY, width: mw, height: mh };
+                          console.log('[SoundSlide] Onset layout (absolute):', onsetWindowLayoutRef.current);
+                          const engine = engineRef.current;
+                          if (engine) {
+                            const cx = pageX + mw / 2;
+                            const cy = pageY + mh / 2;
+                            if (!onsetBodyRef.current) {
+                              onsetBodyRef.current = Bodies.rectangle(cx, cy, mw, mh, { isStatic: false, label: 'onset' });
+                              Composite.add(engine.world, onsetBodyRef.current);
+                            } else {
+                              Body.setPosition(onsetBodyRef.current, { x: cx, y: cy });
+                            }
+                          }
+                        });
+                      });
+                    } catch (e) {
+                      console.log('[SoundSlide] measureInWindow error for onset', e);
                     }
                   }}
                 >
