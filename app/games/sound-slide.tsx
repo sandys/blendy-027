@@ -6,6 +6,7 @@ import {
   useWindowDimensions,
   Platform,
   PanResponder,
+  LayoutChangeEvent,
 } from "react-native";
 import Animated, {
   useSharedValue,
@@ -57,6 +58,9 @@ export default function SoundSlideScreen() {
 
   const gameLayout = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const dragStartCenter = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const onsetNormRef = useRef<{ x: number; y: number }>({ x: 0.35, y: 0.5 });
+  const rimeNormRef = useRef<{ x: number; y: number }>({ x: 0.65, y: 0.5 });
+  const sizeNormRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
   const audioLoopRef = useRef<boolean>(true);
   const isCorrectAnswerGiven = useRef<boolean>(false);
 
@@ -129,8 +133,14 @@ export default function SoundSlideScreen() {
       Engine.update(engineRef.current, 16);
       const ob = onsetBodyRef.current as any;
       const rb = rimeBodyRef.current as any;
-      onsetX.value = ob?.position?.x ?? onsetX.value;
-      onsetY.value = ob?.position?.y ?? onsetY.value;
+      if (ob?.position) {
+        onsetX.value = ob.position.x;
+        onsetY.value = ob.position.y;
+        const gl = gameLayout.current;
+        if (gl) {
+          onsetNormRef.current = { x: ob.position.x / gl.width, y: ob.position.y / gl.height };
+        }
+      }
       if (rb?.position) {
         rimeX.value = rb.position.x;
         rimeY.value = rb.position.y;
@@ -141,45 +151,55 @@ export default function SoundSlideScreen() {
     rafRef.current = requestAnimationFrame(loop);
   };
 
-  const computeCenters = (gl: { width: number; height: number }) => {
-    const margin = Math.max(12, tileSize * 0.25);
+  const computeCentersNorm = (gl: { width: number; height: number }) => {
+    const marginPx = Math.max(12, tileSize * 0.25);
     const spacingTarget = gl.width * (isLandscape ? 0.30 : 0.26);
     const maxSpacing = Math.max(
       tileSize * 1.0,
-      Math.min(spacingTarget, gl.width - 2 * margin - tileSize)
+      Math.min(spacingTarget, gl.width - 2 * marginPx - tileSize)
     );
-    const cxLeft = gl.width / 2 - maxSpacing / 2;
-    const cxRight = gl.width / 2 + maxSpacing / 2;
-    const cy = gl.height * 0.5;
-    return {
-      cxLeft: Math.max(margin + tileSize / 2, cxLeft),
-      cxRight: Math.min(gl.width - margin - tileSize / 2, cxRight),
-      cy,
-    };
+    const cxLeftPx = gl.width / 2 - maxSpacing / 2;
+    const cxRightPx = gl.width / 2 + maxSpacing / 2;
+    const cyPx = gl.height * 0.5;
+    const cxLeft = Math.max(marginPx + tileSize / 2, cxLeftPx) / gl.width;
+    const cxRight = Math.min(gl.width - marginPx - tileSize / 2, cxRightPx) / gl.width;
+    const cy = cyPx / gl.height;
+    return { cxLeft, cxRight, cy };
   };
 
   const layoutBodies = (gl: { x: number; y: number; width: number; height: number }) => {
     const eng = engineRef.current;
     if (!eng) return;
-    const { cxLeft, cxRight, cy } = computeCenters(gl);
-    if (!onsetBodyRef.current) {
-      onsetBodyRef.current = Bodies.rectangle(cxLeft, cy, tileSize, tileSize, { label: "onset", isStatic: false });
-      Composite.add(eng.world, onsetBodyRef.current);
-    } else {
-      Body.setPosition(onsetBodyRef.current, { x: cxLeft, y: cy });
-      Body.setVelocity(onsetBodyRef.current, { x: 0, y: 0 });
-      Body.setAngle(onsetBodyRef.current, 0);
+
+    sizeNormRef.current = { w: tileSize / gl.width, h: tileSize / gl.height };
+
+    const centers = computeCentersNorm(gl);
+    onsetNormRef.current = { x: centers.cxLeft, y: centers.cy };
+    rimeNormRef.current = { x: centers.cxRight, y: centers.cy };
+
+    const onsetXpx = onsetNormRef.current.x * gl.width;
+    const onsetYpx = onsetNormRef.current.y * gl.height;
+    const rimeXpx = rimeNormRef.current.x * gl.width;
+    const rimeYpx = rimeNormRef.current.y * gl.height;
+
+    if (onsetBodyRef.current) {
+      Composite.remove(eng.world, onsetBodyRef.current);
+      onsetBodyRef.current = null;
     }
-    if (!rimeBodyRef.current) {
-      rimeBodyRef.current = Bodies.rectangle(cxRight, cy, tileSize, tileSize, { label: "rime", isStatic: true });
-      Composite.add(eng.world, rimeBodyRef.current);
-    } else {
-      Body.setPosition(rimeBodyRef.current, { x: cxRight, y: cy });
+    if (rimeBodyRef.current) {
+      Composite.remove(eng.world, rimeBodyRef.current);
+      rimeBodyRef.current = null;
     }
-    onsetX.value = cxLeft;
-    onsetY.value = cy;
-    rimeX.value = cxRight;
-    rimeY.value = cy;
+
+    onsetBodyRef.current = Bodies.rectangle(onsetXpx, onsetYpx, tileSize, tileSize, { label: "onset", isStatic: false });
+    rimeBodyRef.current = Bodies.rectangle(rimeXpx, rimeYpx, tileSize, tileSize, { label: "rime", isStatic: true });
+    Composite.add(eng.world, [onsetBodyRef.current, rimeBodyRef.current]);
+
+    onsetX.value = onsetXpx;
+    onsetY.value = onsetYpx;
+    rimeX.value = rimeXpx;
+    rimeY.value = rimeYpx;
+
     startEngineLoop();
   };
 
@@ -197,22 +217,23 @@ export default function SoundSlideScreen() {
         const ob = onsetBodyRef.current;
         const rb = rimeBodyRef.current;
         const eng = engineRef.current;
-        if (!ob || !eng) return;
         const gl = gameLayout.current;
-        const margin = Math.max(12, tileSize * 0.25);
-        const minX = margin + tileSize / 2;
-        const maxX = (gl?.width ?? width) - margin - tileSize / 2;
-        const minY = margin + tileSize / 2;
-        const maxY = (gl?.height ?? height) - margin - tileSize / 2;
+        if (!ob || !eng || !gl) return;
+        const marginPx = Math.max(12, tileSize * 0.25);
+        const minX = marginPx + tileSize / 2;
+        const maxX = gl.width - marginPx - tileSize / 2;
+        const minY = marginPx + tileSize / 2;
+        const maxY = gl.height - marginPx - tileSize / 2;
         let nx = dragStartCenter.current.x + g.dx;
         let ny = dragStartCenter.current.y + g.dy;
         nx = Math.max(minX, Math.min(maxX, nx));
         ny = Math.max(minY, Math.min(maxY, ny));
         Body.setPosition(ob, { x: nx, y: ny });
+        onsetNormRef.current = { x: nx / gl.width, y: ny / gl.height };
         Engine.update(eng, 16);
         if (rb) {
-          const sat = SAT.collides(ob as any, rb as any) as { collided?: boolean } | null;
-          const hovering = !!(sat && sat.collided === true);
+          const result = SAT.collides(ob as any, rb as any) as { collided?: boolean } | null;
+          const hovering = !!(result && result.collided === true);
           rimeScale.value = withTiming(hovering ? 1.06 : 1, { duration: 120 });
         }
       },
@@ -220,22 +241,23 @@ export default function SoundSlideScreen() {
         const ob = onsetBodyRef.current;
         const rb = rimeBodyRef.current;
         const eng = engineRef.current;
+        const gl = gameLayout.current;
         onsetScale.value = withSpring(1);
-        if (!ob || !rb || !eng) return;
+        if (!ob || !rb || !eng || !gl) return;
         Engine.update(eng, 16);
-        const sat = SAT.collides(ob as any, rb as any) as { collided?: boolean } | null;
-        const hit = !!(sat && sat.collided === true);
+        const result = SAT.collides(ob as any, rb as any) as { collided?: boolean } | null;
+        const hit = !!(result && result.collided === true);
         if (hit) {
           runOnJS(handleSuccess)();
         } else {
-          const gl = gameLayout.current;
-          if (gl) {
-            const { cxLeft, cy } = computeCenters(gl);
-            Body.setPosition(ob, { x: cxLeft, y: cy });
-            onsetX.value = withSpring(cxLeft);
-            onsetY.value = withSpring(cy);
-            rimeScale.value = withTiming(1, { duration: 120 });
-          }
+          const centers = computeCentersNorm(gl);
+          onsetNormRef.current = { x: centers.cxLeft, y: centers.cy };
+          const cx = onsetNormRef.current.x * gl.width;
+          const cy = onsetNormRef.current.y * gl.height;
+          Body.setPosition(ob, { x: cx, y: cy });
+          onsetX.value = withSpring(cx);
+          onsetY.value = withSpring(cy);
+          rimeScale.value = withTiming(1, { duration: 120 });
         }
       },
       onPanResponderTerminate: () => {
@@ -245,7 +267,6 @@ export default function SoundSlideScreen() {
   ).current;
 
   useEffect(() => {
-    // Keep provisional positions responsive while waiting for onLayout
     const ox = Math.max(60, width * 0.3);
     const rx = Math.min(width - 60, width * 0.7);
     const cy = height * 0.55;
@@ -325,7 +346,7 @@ export default function SoundSlideScreen() {
       <View
         style={styles.gameArea}
         ref={gameAreaRef}
-        onLayout={(e) => {
+        onLayout={(e: LayoutChangeEvent) => {
           const { x, y, width: w, height: h } = e.nativeEvent.layout;
           gameLayout.current = { x, y, width: w, height: h };
           layoutBodies({ x, y, width: w, height: h });
