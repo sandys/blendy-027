@@ -326,7 +326,7 @@ export default function SoundSlideScreen() {
                       transform: [{ scale: rimeScale }],
                     },
                   ]}
-                  ref={(r) => {
+                  ref={(r: View | null) => {
                     rimeRef.current = r;
                   }}
                   onLayout={() => {
