@@ -60,8 +60,11 @@ export default function SoundSlideScreen() {
   const audioLoopRef = useRef<boolean>(true);
   const isCorrectAnswerGiven = useRef<boolean>(false);
 
-  const tileSize = useMemo(() => (isLandscape ? 96 : 128), [isLandscape]);
-  const desiredSpacing = useMemo(() => (isLandscape ? Math.max(120, width * 0.18) : Math.max(80, width * 0.12)), [isLandscape, width]);
+  const tileSize = useMemo(() => {
+    const minDim = Math.min(width, height);
+    const base = isLandscape ? minDim * 0.18 : minDim * 0.22;
+    return Math.max(72, Math.min(140, Math.round(base)));
+  }, [isLandscape, width, height]);
 
   useEffect(() => {
     engineRef.current = Engine.create();
@@ -132,14 +135,19 @@ export default function SoundSlideScreen() {
 
   const computeCenters = (gl: { width: number; height: number }) => {
     const margin = Math.max(12, tileSize * 0.25);
+    const spacingTarget = gl.width * (isLandscape ? 0.36 : 0.28);
     const maxSpacing = Math.max(
       tileSize * 1.2,
-      Math.min(desiredSpacing, gl.width - 2 * margin - tileSize)
+      Math.min(spacingTarget, gl.width - 2 * margin - tileSize)
     );
     const cxLeft = gl.width / 2 - maxSpacing / 2;
     const cxRight = gl.width / 2 + maxSpacing / 2;
     const cy = gl.height * 0.5;
-    return { cxLeft: Math.max(margin + tileSize / 2, cxLeft), cxRight: Math.min(gl.width - margin - tileSize / 2, cxRight), cy };
+    return {
+      cxLeft: Math.max(margin + tileSize / 2, cxLeft),
+      cxRight: Math.min(gl.width - margin - tileSize / 2, cxRight),
+      cy,
+    };
   };
 
   const layoutBodies = (gl: { x: number; y: number; width: number; height: number }) => {
@@ -227,6 +235,13 @@ export default function SoundSlideScreen() {
     })
   ).current;
 
+  useEffect(() => {
+    if (gameLayout.current) {
+      layoutBodies(gameLayout.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [width, height, isLandscape, tileSize, stage]);
+
   const handleSuccess = () => {
     isCorrectAnswerGiven.current = true;
     audioLoopRef.current = false;
@@ -286,7 +301,7 @@ export default function SoundSlideScreen() {
       <Animated.View style={[styles.flashOverlay, flashAnimatedStyle]} pointerEvents="none" />
       <View style={styles.header}>
         <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 14 }]}>Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}</Text>
-        <Text style={[styles.instructionText, { fontSize: isLandscape ? 16 : 20, marginTop: 4 }]}>Drag the sounds together to make a word!</Text>
+        <Text style={[styles.instructionText, { fontSize: isLandscape ? Math.max(14, width * 0.018) : Math.max(18, width * 0.04), marginTop: 4 }]}>Drag the sounds together to make a word!</Text>
       </View>
 
       <View
@@ -329,7 +344,7 @@ export default function SoundSlideScreen() {
 
         {stage === "merged" && (
           <View style={styles.mergedContainer}>
-            <View style={[styles.wordCard, { padding: isLandscape ? 30 : 40 }]}>
+            <View style={[styles.wordCard, { padding: isLandscape ? Math.max(20, width * 0.03) : Math.max(28, width * 0.06) }]}>
               <Text style={[styles.wordEmoji, { fontSize: isLandscape ? 70 : 100 }]}>{exerciseData?.image}</Text>
               <Text style={[styles.wordText, { fontSize: isLandscape ? 40 : 56 }]}>{exerciseData?.word}</Text>
             </View>
@@ -338,9 +353,9 @@ export default function SoundSlideScreen() {
       </View>
 
       {showFeedback && (
-        <View style={[styles.feedbackContainer, { bottom: isLandscape ? 40 : 80 }]}>
-          <Text style={[styles.feedbackEmoji, { fontSize: isLandscape ? 50 : 72 }]}>🎉</Text>
-          <Text style={[styles.feedbackText, { fontSize: isLandscape ? 24 : 32 }]}>Great job!</Text>
+        <View style={[styles.feedbackContainer, { bottom: Math.max(24, height * (isLandscape ? 0.06 : 0.08)) }]}>
+          <Text style={[styles.feedbackEmoji, { fontSize: Math.max(36, Math.min(84, Math.round((isLandscape ? height : width) * 0.08))) }]}>🎉</Text>
+          <Text style={[styles.feedbackText, { fontSize: Math.max(18, Math.min(36, Math.round((isLandscape ? height : width) * 0.035))) }]}>Great job!</Text>
         </View>
       )}
     </View>
