@@ -43,6 +43,7 @@ export default function SoundSlideScreen() {
   const [isPlayingRime, setIsPlayingRime] = useState<boolean>(false);
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
   const [showDebugGrid, setShowDebugGrid] = useState<boolean>(__DEV__);
+  const [useFlexLayout, setUseFlexLayout] = useState<boolean>(false);
 
   const engineRef = useRef<any | null>(null);
   const onsetBodyRef = useRef<any | null>(null);
@@ -370,9 +371,14 @@ export default function SoundSlideScreen() {
       <View style={styles.header} testID="header">
         <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 14 }]}>Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}</Text>
         <Text style={[styles.instructionText, { fontSize: isLandscape ? Math.max(14, width * 0.018) : Math.max(18, width * 0.04), marginTop: 4 }]}>Drag the sounds together to make a word!</Text>
-        <Pressable testID="toggle-grid" accessibilityRole="button" onPress={() => setShowDebugGrid((v) => !v)} style={styles.gridToggle}>
-          <Text style={styles.gridToggleText}>{showDebugGrid ? "Hide grid" : "Show grid"}</Text>
-        </Pressable>
+        <View style={styles.headerButtonsRow}>
+          <Pressable testID="toggle-grid" accessibilityRole="button" onPress={() => setShowDebugGrid((v) => !v)} style={styles.gridToggle}>
+            <Text style={styles.gridToggleText}>{showDebugGrid ? "Hide grid" : "Show grid"}</Text>
+          </Pressable>
+          <Pressable testID="toggle-layout" accessibilityRole="button" onPress={() => setUseFlexLayout((v) => !v)} style={[styles.gridToggle, { marginLeft: 8 }]}>
+            <Text style={styles.gridToggleText}>{useFlexLayout ? "Absolute layout" : "Flex layout"}</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.boardOuter}>
@@ -384,7 +390,7 @@ export default function SoundSlideScreen() {
             console.log('[SoundSlide] onLayout(board)', { x, y, w, h });
             if (w <= 0 || h <= 0) return;
             gameLayout.current = { x, y, width: w, height: h };
-            layoutBodies({ x, y, width: w, height: h });
+            if (!useFlexLayout) layoutBodies({ x, y, width: w, height: h });
           }}
         >
           {showDebugGrid && (
@@ -403,7 +409,7 @@ export default function SoundSlideScreen() {
             </View>
           )}
 
-          {stage === "initial" && !!gameLayout.current && (
+          {stage === "initial" && !!gameLayout.current && !useFlexLayout && (
             <>
               <Animated.View
                 testID="onset-tile"
@@ -432,6 +438,17 @@ export default function SoundSlideScreen() {
             </>
           )}
 
+          {stage === "initial" && useFlexLayout && (
+            <View style={[styles.flexRow, { gap: Math.max(8, tileSize * 0.25) }]} testID="flex-layout">
+              <View style={[styles.onsetTile, { width: tileSize, height: tileSize, borderRadius: tileSize * 0.2, justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.onset}</Text>
+              </View>
+              <View style={[styles.rimeTile, { width: tileSize, height: tileSize, borderRadius: tileSize * 0.2, justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.rime}</Text>
+              </View>
+            </View>
+          )}
+
           {stage === "merged" && (
             <View style={styles.mergedContainer}>
               <View style={[styles.wordCard, { padding: isLandscape ? Math.max(20, width * 0.03) : Math.max(28, width * 0.06) }]}>
@@ -456,10 +473,12 @@ export default function SoundSlideScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFF8E1" },
   header: { paddingVertical: 12, paddingHorizontal: 20, alignItems: "center" },
+  headerButtonsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
   instructionText: { fontWeight: "700" as const, color: "#FFD93D", textAlign: "center", marginBottom: 8 },
   progressText: { color: "#999", fontWeight: "600" as const },
   boardOuter: { flex: 1, justifyContent: "center", alignItems: "center" },
   board: { justifyContent: "center", alignItems: "center", position: "relative" as const, maxWidth: 1024, width: "100%", overflow: "hidden" as const, borderRadius: 16, borderWidth: 1, borderColor: "#F0E4B2" },
+  flexRow: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', flexDirection: 'row' as const },
   onsetTile: {
     backgroundColor: "#FF6B9D",
     justifyContent: "center",
