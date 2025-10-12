@@ -7,6 +7,7 @@ import {
   Platform,
   PanResponder,
   LayoutChangeEvent,
+  Pressable,
 } from "react-native";
 import Animated, {
   useSharedValue,
@@ -41,6 +42,7 @@ export default function SoundSlideScreen() {
   const [isPlayingOnset, setIsPlayingOnset] = useState<boolean>(false);
   const [isPlayingRime, setIsPlayingRime] = useState<boolean>(false);
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
+  const [showDebugGrid, setShowDebugGrid] = useState<boolean>(__DEV__);
 
   const engineRef = useRef<any | null>(null);
   const onsetBodyRef = useRef<any | null>(null);
@@ -67,7 +69,7 @@ export default function SoundSlideScreen() {
   const tileSize = useMemo(() => {
     const minDim = Math.min(width, height);
     const base = isLandscape ? minDim * 0.14 : minDim * 0.2;
-    return Math.max(64, Math.min(120, Math.round(base)));
+    return Math.max(64, Math.min(140, Math.round(base)));
   }, [isLandscape, width, height]);
 
   useEffect(() => {
@@ -77,7 +79,6 @@ export default function SoundSlideScreen() {
       (engineRef.current.world.gravity as any).y = 0;
       (engineRef.current.world.gravity as any).scale = 0;
     }
-    // Set safe initial positions so both tiles are visible even before onLayout
     const ox = Math.max(60, width * 0.3);
     const rx = Math.min(width - 60, width * 0.7);
     const cy = height * 0.55;
@@ -157,14 +158,12 @@ export default function SoundSlideScreen() {
     const minCx = (marginPx + half) / gl.width;
     const maxCx = (gl.width - marginPx - half) / gl.width;
 
-    // Start from ideal normalized anchors and then clamp to ensure full visibility
     const idealLeft = 0.35;
     const idealRight = 0.65;
 
     const cxLeft = Math.max(minCx, Math.min(maxCx, idealLeft));
     const cxRight = Math.max(minCx, Math.min(maxCx, idealRight));
 
-    // Ensure minimum separation between centers to avoid overlap
     const minSepPx = Math.max(tileSize * 1.1, 48);
     const sepPx = Math.abs(cxRight * gl.width - cxLeft * gl.width);
     if (sepPx < minSepPx) {
@@ -174,7 +173,6 @@ export default function SoundSlideScreen() {
       let newRight = mid + offset;
       newLeft = Math.max(minCx, Math.min(maxCx, newLeft));
       newRight = Math.max(minCx, Math.min(maxCx, newRight));
-      // If clamping collapsed separation, push from whichever side has room
       if ((newRight - newLeft) * gl.width < minSepPx) {
         const roomLeft = (newLeft - minCx) * gl.width;
         const roomRight = (maxCx - newRight) * gl.width;
@@ -307,7 +305,6 @@ export default function SoundSlideScreen() {
     if (gameLayout.current) {
       layoutBodies(gameLayout.current);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [width, height, isLandscape, tileSize, stage]);
 
   const handleSuccess = () => {
@@ -364,17 +361,23 @@ export default function SoundSlideScreen() {
     ],
   }), [tileSize, rimeScale, rimeX, rimeY]);
 
+  const cols = 12;
+  const rows = 8;
+
   return (
     <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <Animated.View style={[styles.flashOverlay, flashAnimatedStyle]} pointerEvents="none" />
       <View style={styles.header} testID="header">
         <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 14 }]}>Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}</Text>
         <Text style={[styles.instructionText, { fontSize: isLandscape ? Math.max(14, width * 0.018) : Math.max(18, width * 0.04), marginTop: 4 }]}>Drag the sounds together to make a word!</Text>
+        <Pressable testID="toggle-grid" accessibilityRole="button" onPress={() => setShowDebugGrid((v) => !v)} style={styles.gridToggle}>
+          <Text style={styles.gridToggleText}>{showDebugGrid ? "Hide grid" : "Show grid"}</Text>
+        </Pressable>
       </View>
 
       <View style={styles.boardOuter}>
         <View
-          style={[styles.board, isLandscape ? { aspectRatio: 16 / 9, width: '100%' } : { width: '100%', height: '100%' }]}
+          style={[styles.board, isLandscape ? { aspectRatio: 16 / 9, width: "100%" } : { width: "100%", height: "100%" }]}
           ref={gameAreaRef}
           onLayout={(e: LayoutChangeEvent) => {
             const { x, y, width: w, height: h } = e.nativeEvent.layout;
@@ -384,6 +387,22 @@ export default function SoundSlideScreen() {
             layoutBodies({ x, y, width: w, height: h });
           }}
         >
+          {showDebugGrid && (
+            <View pointerEvents="none" style={styles.debugOverlay} testID="debug-grid">
+              <View style={styles.gridColumnsRow}>
+                {Array.from({ length: cols }).map((_, i) => (
+                  <View key={`col-${i}`} style={styles.gridCol} />
+                ))}
+              </View>
+              <View style={styles.gridRowsCol}>
+                {Array.from({ length: rows }).map((_, i) => (
+                  <View key={`row-${i}`} style={styles.gridRow} />
+                ))}
+              </View>
+              <View style={styles.boardBounds} />
+            </View>
+          )}
+
           {stage === "initial" && !!gameLayout.current && (
             <>
               <Animated.View
@@ -440,7 +459,7 @@ const styles = StyleSheet.create({
   instructionText: { fontWeight: "700" as const, color: "#FFD93D", textAlign: "center", marginBottom: 8 },
   progressText: { color: "#999", fontWeight: "600" as const },
   boardOuter: { flex: 1, justifyContent: "center", alignItems: "center" },
-  board: { justifyContent: "center", alignItems: "center", position: "relative" as const, maxWidth: 900, width: '100%' },
+  board: { justifyContent: "center", alignItems: "center", position: "relative" as const, maxWidth: 1024, width: "100%", overflow: "hidden" as const, borderRadius: 16, borderWidth: 1, borderColor: "#F0E4B2" },
   onsetTile: {
     backgroundColor: "#FF6B9D",
     justifyContent: "center",
@@ -499,4 +518,12 @@ const styles = StyleSheet.create({
   feedbackEmoji: { marginBottom: 12 },
   feedbackText: { fontWeight: "700" as const, textAlign: "center", color: "#333" },
   flashOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 },
+  gridToggle: { marginTop: 8, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: "#EEE" },
+  gridToggleText: { color: "#333", fontWeight: "600" as const },
+  debugOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 5 },
+  gridColumnsRow: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, flexDirection: "row" as const, gap: 0 },
+  gridCol: { flex: 1, backgroundColor: "transparent", borderLeftWidth: 1, borderColor: "rgba(0,0,0,0.08)" },
+  gridRowsCol: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, justifyContent: "space-between" },
+  gridRow: { height: 1, backgroundColor: "rgba(0,0,0,0.08)" },
+  boardBounds: { position: "absolute", top: 8, bottom: 8, left: 8, right: 8, borderColor: "rgba(255,0,0,0.35)", borderWidth: 2, borderStyle: "dashed" as const, borderRadius: 12 },
 });
