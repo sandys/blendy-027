@@ -46,7 +46,8 @@ export default function WordBuilderScreen() {
   const [blendedText, setBlendedText] = useState<string>("");
   const audioLoopRef = useRef<boolean>(true);
   const isCorrectAnswerGiven = useRef<boolean>(false);
-  const dropZoneLayout = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const dropZoneLayout = useRef<{ pageX: number; pageY: number; width: number; height: number } | null>(null);
+  const dropZoneRef = useRef<View | null>(null);
   const letterLayoutsRef = useRef<Map<number, { x: number; y: number; width: number; height: number }>>(new Map());
   const flashAnim = useRef(new Animated.Value(0)).current;
 
@@ -176,14 +177,14 @@ export default function WordBuilderScreen() {
         }
 
         const dropZone = dropZoneLayout.current;
-        const letterCenterX = letterLayout.x + letterLayout.width / 2 + gesture.dx;
-        const letterCenterY = letterLayout.y + letterLayout.height / 2 + gesture.dy;
+        const releasePageX = (evt?.nativeEvent as any)?.pageX ?? 0;
+        const releasePageY = (evt?.nativeEvent as any)?.pageY ?? 0;
 
         const isInDropZone =
-          letterCenterX >= dropZone.x &&
-          letterCenterX <= dropZone.x + dropZone.width &&
-          letterCenterY >= dropZone.y &&
-          letterCenterY <= dropZone.y + dropZone.height;
+          releasePageX >= dropZone.pageX &&
+          releasePageX <= dropZone.pageX + dropZone.width &&
+          releasePageY >= dropZone.pageY &&
+          releasePageY <= dropZone.pageY + dropZone.height;
 
         if (isInDropZone) {
           if (Platform.OS !== "web") {
@@ -310,10 +311,18 @@ export default function WordBuilderScreen() {
                     backgroundColor: showSuccess ? "rgba(76, 175, 80, 0.1)" : "rgba(33, 150, 243, 0.1)",
                   },
                 ]}
-                onLayout={(event) => {
-                  const { x, y, width, height } = event.nativeEvent.layout;
-                  dropZoneLayout.current = { x, y, width, height };
-                  console.log('[WordBuilder] Drop zone layout:', dropZoneLayout.current);
+                ref={(r) => {
+                  dropZoneRef.current = r;
+                }}
+                onLayout={() => {
+                  try {
+                    dropZoneRef.current?.measureInWindow((pageX, pageY, width, height) => {
+                      dropZoneLayout.current = { pageX, pageY, width, height };
+                      console.log('[WordBuilder] Drop zone layout (absolute):', dropZoneLayout.current);
+                    });
+                  } catch (e) {
+                    console.log('[WordBuilder] measureInWindow error', e);
+                  }
                 }}
               >
                 {blendedText ? (
@@ -358,7 +367,7 @@ export default function WordBuilderScreen() {
                       onLayout={(event) => {
                         const { x, y, width, height } = event.nativeEvent.layout;
                         letterLayoutsRef.current.set(index, { x, y, width, height });
-                        console.log('[WordBuilder] Letter layout:', { index, x, y, width, height });
+                        console.log('[WordBuilder] Letter layout (relative to lettersRow):', { index, x, y, width, height });
                       }}
                     >
                       <Text style={[styles.letterText, { fontSize: tileSize * 0.44 }]}>
