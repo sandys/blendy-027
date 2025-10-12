@@ -62,8 +62,8 @@ export default function SoundSlideScreen() {
 
   const tileSize = useMemo(() => {
     const minDim = Math.min(width, height);
-    const base = isLandscape ? minDim * 0.18 : minDim * 0.22;
-    return Math.max(72, Math.min(140, Math.round(base)));
+    const base = isLandscape ? minDim * 0.14 : minDim * 0.2;
+    return Math.max(64, Math.min(120, Math.round(base)));
   }, [isLandscape, width, height]);
 
   useEffect(() => {
@@ -73,6 +73,14 @@ export default function SoundSlideScreen() {
       (engineRef.current.world.gravity as any).y = 0;
       (engineRef.current.world.gravity as any).scale = 0;
     }
+    // Set safe initial positions so both tiles are visible even before onLayout
+    const ox = Math.max(60, width * 0.3);
+    const rx = Math.min(width - 60, width * 0.7);
+    const cy = height * 0.55;
+    onsetX.value = ox;
+    onsetY.value = cy;
+    rimeX.value = rx;
+    rimeY.value = cy;
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       engineRef.current = null;
@@ -135,9 +143,9 @@ export default function SoundSlideScreen() {
 
   const computeCenters = (gl: { width: number; height: number }) => {
     const margin = Math.max(12, tileSize * 0.25);
-    const spacingTarget = gl.width * (isLandscape ? 0.36 : 0.28);
+    const spacingTarget = gl.width * (isLandscape ? 0.30 : 0.26);
     const maxSpacing = Math.max(
-      tileSize * 1.2,
+      tileSize * 1.0,
       Math.min(spacingTarget, gl.width - 2 * margin - tileSize)
     );
     const cxLeft = gl.width / 2 - maxSpacing / 2;
@@ -177,8 +185,8 @@ export default function SoundSlideScreen() {
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => stage === "initial",
-      onMoveShouldSetPanResponder: () => stage === "initial",
+      onStartShouldSetPanResponder: () => stage === "initial" && !!gameLayout.current,
+      onMoveShouldSetPanResponder: () => stage === "initial" && !!gameLayout.current,
       onPanResponderGrant: () => {
         const ob = onsetBodyRef.current;
         if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -192,10 +200,10 @@ export default function SoundSlideScreen() {
         if (!ob || !eng) return;
         const gl = gameLayout.current;
         const margin = Math.max(12, tileSize * 0.25);
-        const minX = (gl?.x ?? 0) + margin + tileSize / 2;
-        const maxX = (gl ? gl.x + gl.width : width) - margin - tileSize / 2;
-        const minY = (gl?.y ?? 0) + margin + tileSize / 2;
-        const maxY = (gl ? gl.y + gl.height : height) - margin - tileSize / 2;
+        const minX = margin + tileSize / 2;
+        const maxX = (gl?.width ?? width) - margin - tileSize / 2;
+        const minY = margin + tileSize / 2;
+        const maxY = (gl?.height ?? height) - margin - tileSize / 2;
         let nx = dragStartCenter.current.x + g.dx;
         let ny = dragStartCenter.current.y + g.dy;
         nx = Math.max(minX, Math.min(maxX, nx));
@@ -226,6 +234,7 @@ export default function SoundSlideScreen() {
             Body.setPosition(ob, { x: cxLeft, y: cy });
             onsetX.value = withSpring(cxLeft);
             onsetY.value = withSpring(cy);
+            rimeScale.value = withTiming(1, { duration: 120 });
           }
         }
       },
@@ -236,6 +245,15 @@ export default function SoundSlideScreen() {
   ).current;
 
   useEffect(() => {
+    // Keep provisional positions responsive while waiting for onLayout
+    const ox = Math.max(60, width * 0.3);
+    const rx = Math.min(width - 60, width * 0.7);
+    const cy = height * 0.55;
+    onsetX.value = ox;
+    onsetY.value = cy;
+    rimeX.value = rx;
+    rimeY.value = cy;
+
     if (gameLayout.current) {
       layoutBodies(gameLayout.current);
     }
@@ -313,7 +331,7 @@ export default function SoundSlideScreen() {
           layoutBodies({ x, y, width: w, height: h });
         }}
       >
-        {stage === "initial" && (
+        {stage === "initial" && !!gameLayout.current && (
           <>
             <Animated.View
               testID="onset-tile"
