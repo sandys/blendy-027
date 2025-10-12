@@ -46,7 +46,7 @@ export default function SoundSlideScreen() {
   const rimeZoneLayout = useRef<{ pageX: number; pageY: number; width: number; height: number } | null>(null);
   const rimeRef = useRef<View | null>(null);
   const onsetRef = useRef<View | null>(null);
-  const lastDragRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  const lastDragRef = useRef<{ dx: number; dy: number; pageX: number; pageY: number }>({ dx: 0, dy: 0, pageX: 0, pageY: 0 });
   const currentOnsetScaleRef = useRef<number>(1);
 
   useEffect(() => {
@@ -140,8 +140,10 @@ export default function SoundSlideScreen() {
         }).start();
       },
       onPanResponderMove: (evt, gestureState) => {
-        console.log('[SoundSlide] Pan responder move:', { dx: gestureState.dx, dy: gestureState.dy });
-        lastDragRef.current = { dx: gestureState.dx, dy: gestureState.dy };
+        const movePageX = (evt?.nativeEvent as any)?.pageX ?? 0;
+        const movePageY = (evt?.nativeEvent as any)?.pageY ?? 0;
+        console.log('[SoundSlide] Pan responder move:', { dx: gestureState.dx, dy: gestureState.dy, pageX: movePageX, pageY: movePageY });
+        lastDragRef.current = { dx: gestureState.dx, dy: gestureState.dy, pageX: movePageX, pageY: movePageY };
         onsetPosition.setValue({ x: gestureState.dx, y: gestureState.dy });
       },
       onPanResponderRelease: (evt, gestureState) => {
@@ -167,8 +169,8 @@ export default function SoundSlideScreen() {
         }
 
         const dropZone = rimeZoneLayout.current;
-        const releasePageX = (evt?.nativeEvent as any)?.pageX ?? 0;
-        const releasePageY = (evt?.nativeEvent as any)?.pageY ?? 0;
+        const releasePageX = ((evt?.nativeEvent as any)?.pageX ?? lastDragRef.current.pageX) ?? 0;
+        const releasePageY = ((evt?.nativeEvent as any)?.pageY ?? lastDragRef.current.pageY) ?? 0;
 
         const pointerInsideDropZone = (zone: { pageX: number; pageY: number; width: number; height: number } | null) => {
           if (!zone) return false;
@@ -203,11 +205,21 @@ export default function SoundSlideScreen() {
                 const top = (oy + (dy ?? 0)) - (scaledH - oh) / 2;
                 const onsetRect = { x: left, y: top, width: scaledW, height: scaledH };
 
-                const margin = 16;
+                const margin = 24;
                 const overlapX = onsetRect.x < (rimeRect.x + rimeRect.width + margin) && (onsetRect.x + onsetRect.width + margin) > rimeRect.x;
                 const overlapY = onsetRect.y < (rimeRect.y + rimeRect.height + margin) && (onsetRect.y + onsetRect.height + margin) > rimeRect.y;
-                const isOverlap = overlapX && overlapY;
-                console.log('[SoundSlide] Rect collision check (scaled+margin)', { onsetRect, rimeRect, scale, isOverlap });
+                const isRectOverlap = overlapX && overlapY;
+
+                const onsetCenter = { x: onsetRect.x + onsetRect.width / 2, y: onsetRect.y + onsetRect.height / 2 };
+                const rimeCenter = { x: rimeRect.x + rimeRect.width / 2, y: rimeRect.y + rimeRect.height / 2 };
+                const dxC = onsetCenter.x - rimeCenter.x;
+                const dyC = onsetCenter.y - rimeCenter.y;
+                const centerDist = Math.sqrt(dxC * dxC + dyC * dyC);
+                const threshold = Math.min(rimeRect.width, rimeRect.height) * 0.65;
+                const isCenterClose = centerDist <= threshold;
+
+                const isOverlap = isRectOverlap || isCenterClose;
+                console.log('[SoundSlide] Collision check', { onsetRect, rimeRect, scale, isRectOverlap, centerDist, threshold, isCenterClose, isOverlap });
                 if (isOverlap) {
                   handleSuccess();
                 } else {
