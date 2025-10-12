@@ -311,9 +311,9 @@ export default function WordBuilderScreen() {
                   },
                 ]}
                 onLayout={(event) => {
-                  event.target.measure((x, y, width, height, pageX, pageY) => {
-                    dropZoneLayout.current = { x: pageX, y: pageY, width, height };
-                  });
+                  const { x, y, width, height } = event.nativeEvent.layout;
+                  dropZoneLayout.current = { x, y, width, height };
+                  console.log('[WordBuilder] Drop zone layout:', dropZoneLayout.current);
                 }}
               >
                 {blendedText ? (
@@ -337,6 +337,7 @@ export default function WordBuilderScreen() {
                   return (
                     <Animated.View
                       key={draggableLetter.id}
+                      testID={`letter-${index}`}
                       {...panResponder.panHandlers}
                       style={[
                         styles.letterTile,
@@ -355,9 +356,9 @@ export default function WordBuilderScreen() {
                         },
                       ]}
                       onLayout={(event) => {
-                        event.target.measure((x, y, width, height, pageX, pageY) => {
-                          letterLayoutsRef.current.set(index, { x: pageX, y: pageY, width, height });
-                        });
+                        const { x, y, width, height } = event.nativeEvent.layout;
+                        letterLayoutsRef.current.set(index, { x, y, width, height });
+                        console.log('[WordBuilder] Letter layout:', { index, x, y, width, height });
                       }}
                     >
                       <Text style={[styles.letterText, { fontSize: tileSize * 0.44 }]}>

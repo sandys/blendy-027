@@ -298,14 +298,12 @@ export default function SoundSlideScreen() {
                       ],
                     },
                   ]}
+                  testID="onset-tile"
                   {...panResponder.panHandlers}
                   onLayout={(event) => {
-                    setTimeout(() => {
-                      event.currentTarget.measureInWindow((x, y, w, h) => {
-                        onsetLayoutRef.current = { x, y, width: w, height: h };
-                        console.log('[SoundSlide] Onset layout (measureInWindow):', { x, y, width: w, height: h });
-                      });
-                    }, 100);
+                    const { x, y, width: w, height: h } = event.nativeEvent.layout;
+                    onsetLayoutRef.current = { x, y, width: w, height: h };
+                    console.log('[SoundSlide] Onset layout (onLayout):', { x, y, width: w, height: h });
                   }}
                 >
                   <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.onset}</Text>
@@ -321,6 +319,7 @@ export default function SoundSlideScreen() {
 
               <View style={styles.tileWrapper}>
                 <Animated.View
+                  testID="rime-tile"
                   style={[
                     styles.rimeTile,
                     isPlayingRime && styles.tilePlaying,
@@ -333,12 +332,9 @@ export default function SoundSlideScreen() {
                     },
                   ]}
                   onLayout={(event) => {
-                    setTimeout(() => {
-                      event.currentTarget.measureInWindow((x, y, w, h) => {
-                        rimeLayoutRef.current = { x, y, width: w, height: h };
-                        console.log('[SoundSlide] Rime layout (measureInWindow):', { x, y, width: w, height: h });
-                      });
-                    }, 100);
+                    const { x, y, width: w, height: h } = event.nativeEvent.layout;
+                    rimeLayoutRef.current = { x, y, width: w, height: h };
+                    console.log('[SoundSlide] Rime layout (onLayout):', { x, y, width: w, height: h });
                   }}
                 >
                   <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.rime}</Text>
