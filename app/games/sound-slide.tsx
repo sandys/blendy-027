@@ -3,17 +3,25 @@ import {
   View,
   Text,
   StyleSheet,
-  Animated,
   useWindowDimensions,
   Platform,
   PanResponder,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  runOnJS,
+  interpolateColor,
+} from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
 import { Volume2 } from "lucide-react-native";
+import Matter, { Bodies, Body, Engine, SAT, Composite } from "matter-js";
 
 export default function SoundSlideScreen() {
   const insets = useSafeAreaInsets();
@@ -36,18 +44,23 @@ export default function SoundSlideScreen() {
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
   const audioLoopRef = useRef<boolean>(true);
   const isCorrectAnswerGiven = useRef<boolean>(false);
-  const flashAnim = useRef(new Animated.Value(0)).current;
 
-  const onsetPosition = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-  const onsetScale = useRef(new Animated.Value(1)).current;
-  const rimeScale = useRef(new Animated.Value(1)).current;
+  const onsetX = useSharedValue(0);
+  const onsetY = useSharedValue(0);
+  const onsetScale = useSharedValue(1);
+  const rimeScale = useSharedValue(1);
+  const flash = useSharedValue(0);
+
   const onsetLayoutRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const rimeLayoutRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const rimeZoneLayout = useRef<{ pageX: number; pageY: number; width: number; height: number } | null>(null);
-  const rimeRef = useRef<View | null>(null);
-  const onsetRef = useRef<View | null>(null);
+  const rimeRef = useRef<View>(null);
+  const onsetRef = useRef<View>(null);
   const lastDragRef = useRef<{ dx: number; dy: number; pageX: number; pageY: number }>({ dx: 0, dy: 0, pageX: 0, pageY: 0 });
-  const currentOnsetScaleRef = useRef<number>(1);
+
+  const engineRef = useRef<Engine | null>(null);
+  const onsetBodyRef = useRef<Matter.Body | null>(null);
+  const rimeBodyRef = useRef<Matter.Body | null>(null);
 
   useEffect(() => {
     if (!exerciseData) return;
@@ -59,25 +72,22 @@ export default function SoundSlideScreen() {
     setStage("initial");
     setShowFeedback(false);
     setShowSuccess(false);
-    onsetPosition.setValue({ x: 0, y: 0 });
-    onsetScale.setValue(1);
-    rimeScale.setValue(1);
+
+    onsetX.value = 0;
+    onsetY.value = 0;
+    onsetScale.value = 1;
+    rimeScale.value = 1;
 
     rimeZoneLayout.current = null;
 
+    const engine = Engine.create();
+    engineRef.current = engine;
+    // Bodies will be created when layouts are known
+
     const playInitialFeedback = async () => {
-      Animated.sequence([
-        Animated.timing(flashAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-        Animated.timing(flashAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-      ]).start();
+      flash.value = withTiming(1, { duration: 200 }, () => {
+        flash.value = withTiming(0, { duration: 200 });
+      });
 
       if (Platform.OS !== "web") {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -108,8 +118,11 @@ export default function SoundSlideScreen() {
 
     return () => {
       audioLoopRef.current = false;
+      engineRef.current = null;
+      onsetBodyRef.current = null;
+      rimeBodyRef.current = null;
     };
-  }, [exerciseIndex, exerciseData, flashAnim, onsetPosition, onsetScale, rimeScale]);
+  }, [exerciseIndex, exerciseData, onsetX, onsetY, onsetScale, rimeScale, flash]);
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -117,12 +130,69 @@ export default function SoundSlideScreen() {
         rimeRef.current?.measureInWindow((pageX, pageY, w, h) => {
           rimeZoneLayout.current = { pageX, pageY, width: w, height: h };
           console.log('[SoundSlide] Re-measured rime drop zone on dimension change', rimeZoneLayout.current);
+          const engine = engineRef.current;
+          if (engine) {
+            const cx = pageX + w / 2;
+            const cy = pageY + h / 2;
+            if (!rimeBodyRef.current) {
+              rimeBodyRef.current = Bodies.rectangle(cx, cy, w, h, { isStatic: true, label: 'rime' });
+              Composite.add(engine.world, rimeBodyRef.current);
+            } else {
+              Body.setPosition(rimeBodyRef.current, { x: cx, y: cy });
+            }
+          }
         });
       } catch (e) {
         console.log('[SoundSlide] measureInWindow error on dimension effect', e);
       }
     });
   }, [width, height]);
+
+  const handleSuccessJS = () => {
+    isCorrectAnswerGiven.current = true;
+    audioLoopRef.current = false;
+    setIsPlayingOnset(false);
+    setIsPlayingRime(false);
+    setShowSuccess(true);
+
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    speakText(exerciseData?.word || "", { usePhoneme: false, rate: 0.7 });
+
+    onsetX.value = withSpring(width * 0.25);
+    onsetY.value = withSpring(0);
+    onsetScale.value = withSpring(1);
+    rimeScale.value = withTiming(1.1, { duration: 200 }, () => {
+      rimeScale.value = withTiming(1, { duration: 200 });
+    });
+
+    setTimeout(() => {
+      setStage("merged");
+      setShowFeedback(true);
+    }, 800);
+
+    setTimeout(() => {
+      const nextExerciseIndex = exerciseIndex + 1;
+      if (lesson && nextExerciseIndex < (lesson.exercises?.length ?? 0)) {
+        router.replace({
+          pathname: "/games/sound-slide",
+          params: { lesson: lessonNumber, exercise: nextExerciseIndex },
+        });
+      } else {
+        router.back();
+      }
+    }, 3000);
+  };
+
+  const resetOnsetJS = () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    onsetX.value = withSpring(0);
+    onsetY.value = withSpring(0);
+    onsetScale.value = withSpring(1);
+  };
 
   const panResponder = useRef(
     PanResponder.create({
@@ -133,211 +203,91 @@ export default function SoundSlideScreen() {
         if (Platform.OS !== "web") {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
-        currentOnsetScaleRef.current = 1.1;
-        Animated.spring(onsetScale, {
-          toValue: 1.1,
-          useNativeDriver: false,
-        }).start();
+        onsetScale.value = withSpring(1.1);
       },
       onPanResponderMove: (evt, gestureState) => {
         const movePageX = (evt?.nativeEvent as any)?.pageX ?? 0;
         const movePageY = (evt?.nativeEvent as any)?.pageY ?? 0;
-        console.log('[SoundSlide] Pan responder move:', { dx: gestureState.dx, dy: gestureState.dy, pageX: movePageX, pageY: movePageY });
         lastDragRef.current = { dx: gestureState.dx, dy: gestureState.dy, pageX: movePageX, pageY: movePageY };
-        onsetPosition.setValue({ x: gestureState.dx, y: gestureState.dy });
+        onsetX.value = gestureState.dx;
+        onsetY.value = gestureState.dy;
+
+        const engine = engineRef.current;
+        const onsetBody = onsetBodyRef.current;
+        if (engine && onsetBody && onsetLayoutRef.current) {
+          const baseLeft = (onsetLayoutRef.current.x ?? 0) + (onsetLayoutRef.current.width ?? 0) / 2;
+          const baseTop = (onsetLayoutRef.current.y ?? 0) + (onsetLayoutRef.current.height ?? 0) / 2;
+          Body.setPosition(onsetBody, { x: baseLeft + gestureState.dx, y: baseTop + gestureState.dy });
+          Engine.update(engine, 16);
+
+          const rimeBody = rimeBodyRef.current;
+          if (rimeBody) {
+            const sat = SAT.collides(onsetBody as Matter.Body, rimeBody as Matter.Body);
+            const hovering = sat.collided === true;
+            rimeScale.value = withTiming(hovering ? 1.05 : 1, { duration: 120 });
+          }
+        }
       },
       onPanResponderRelease: (evt, gestureState) => {
-        console.log('[SoundSlide] Pan responder release:', { dx: gestureState.dx, dy: gestureState.dy });
-        const onsetLayout = onsetLayoutRef.current;
-        const rimeLayout = rimeLayoutRef.current;
+        const engine = engineRef.current;
+        const onsetBody = onsetBodyRef.current;
+        const rimeBody = rimeBodyRef.current;
 
-        if (!onsetLayout || !rimeLayout) {
-          console.log('[SoundSlide] Layout not ready, resetting position');
-          Animated.parallel([
-            Animated.spring(onsetPosition, {
-              toValue: { x: 0, y: 0 },
-              useNativeDriver: false,
-            }),
-            Animated.spring(onsetScale, {
-              toValue: 1,
-              useNativeDriver: false,
-            }),
-          ]).start(() => {
-            currentOnsetScaleRef.current = 1;
-          });
+        if (!engine || !onsetBody || !rimeBody || !onsetLayoutRef.current) {
+          runOnJS(resetOnsetJS)();
           return;
         }
 
-        const dropZone = rimeZoneLayout.current;
-        const releasePageX = ((evt?.nativeEvent as any)?.pageX ?? lastDragRef.current.pageX) ?? 0;
-        const releasePageY = ((evt?.nativeEvent as any)?.pageY ?? lastDragRef.current.pageY) ?? 0;
+        const baseLeft = (onsetLayoutRef.current.x ?? 0) + (onsetLayoutRef.current.width ?? 0) / 2;
+        const baseTop = (onsetLayoutRef.current.y ?? 0) + (onsetLayoutRef.current.height ?? 0) / 2;
+        Body.setPosition(onsetBody, { x: baseLeft + gestureState.dx, y: baseTop + gestureState.dy });
+        Engine.update(engine, 16);
 
-        const pointerInsideDropZone = (zone: { pageX: number; pageY: number; width: number; height: number } | null) => {
-          if (!zone) return false;
-          const inside =
-            releasePageX >= zone.pageX &&
-            releasePageX <= zone.pageX + zone.width &&
-            releasePageY >= zone.pageY &&
-            releasePageY <= zone.pageY + zone.height;
-          console.log('[SoundSlide] Pointer collision check', {
-            release: { x: releasePageX, y: releasePageY },
-            zone,
-            inside,
-          });
-          return inside;
-        };
-
-        const attemptCollisionDecision = () => {
-          if (pointerInsideDropZone(dropZone)) {
-            handleSuccess();
-            return;
-          }
-
-          try {
-            rimeRef.current?.measureInWindow((rx, ry, rw, rh) => {
-              const rimeRect = { x: rx, y: ry, width: rw, height: rh };
-              onsetRef.current?.measureInWindow((ox, oy, ow, oh) => {
-                const { dx, dy } = lastDragRef.current;
-                const scale = currentOnsetScaleRef.current ?? 1;
-                const scaledW = ow * scale;
-                const scaledH = oh * scale;
-                const left = (ox + (dx ?? 0)) - (scaledW - ow) / 2;
-                const top = (oy + (dy ?? 0)) - (scaledH - oh) / 2;
-                const onsetRect = { x: left, y: top, width: scaledW, height: scaledH };
-
-                const margin = 24;
-                const overlapX = onsetRect.x < (rimeRect.x + rimeRect.width + margin) && (onsetRect.x + onsetRect.width + margin) > rimeRect.x;
-                const overlapY = onsetRect.y < (rimeRect.y + rimeRect.height + margin) && (onsetRect.y + onsetRect.height + margin) > rimeRect.y;
-                const isRectOverlap = overlapX && overlapY;
-
-                const onsetCenter = { x: onsetRect.x + onsetRect.width / 2, y: onsetRect.y + onsetRect.height / 2 };
-                const rimeCenter = { x: rimeRect.x + rimeRect.width / 2, y: rimeRect.y + rimeRect.height / 2 };
-                const dxC = onsetCenter.x - rimeCenter.x;
-                const dyC = onsetCenter.y - rimeCenter.y;
-                const centerDist = Math.sqrt(dxC * dxC + dyC * dyC);
-                const threshold = Math.min(rimeRect.width, rimeRect.height) * 0.65;
-                const isCenterClose = centerDist <= threshold;
-
-                const isOverlap = isRectOverlap || isCenterClose;
-                console.log('[SoundSlide] Collision check', { onsetRect, rimeRect, scale, isRectOverlap, centerDist, threshold, isCenterClose, isOverlap });
-                if (isOverlap) {
-                  handleSuccess();
-                } else {
-                  resetOnset();
-                }
-              });
-            });
-          } catch (e) {
-            console.log('[SoundSlide] measureInWindow error during release', e);
-            if (pointerInsideDropZone(dropZone)) {
-              handleSuccess();
-            } else {
-              resetOnset();
-            }
-          }
-        };
-
-        const handleSuccess = () => {
-          isCorrectAnswerGiven.current = true;
-          audioLoopRef.current = false;
-          setIsPlayingOnset(false);
-          setIsPlayingRime(false);
-          setShowSuccess(true);
-
-          if (Platform.OS !== "web") {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          }
-
-          speakText(exerciseData?.word || "", { usePhoneme: false, rate: 0.7 });
-
-          Animated.parallel([
-            Animated.spring(onsetPosition, {
-              toValue: { x: width * 0.25, y: 0 },
-              useNativeDriver: false,
-            }),
-            Animated.spring(onsetScale, {
-              toValue: 1,
-              useNativeDriver: false,
-            }),
-            Animated.sequence([
-              Animated.timing(rimeScale, {
-                toValue: 1.1,
-                duration: 200,
-                useNativeDriver: false,
-              }),
-              Animated.timing(rimeScale, {
-                toValue: 1,
-                duration: 200,
-                useNativeDriver: false,
-              }),
-            ]),
-          ]).start(() => {
-            setTimeout(() => {
-              setStage("merged");
-              setShowFeedback(true);
-            }, 800);
-
-            setTimeout(() => {
-              const nextExerciseIndex = exerciseIndex + 1;
-              if (lesson && nextExerciseIndex < lesson.exercises.length) {
-                router.replace({
-                  pathname: "/games/sound-slide",
-                  params: { lesson: lessonNumber, exercise: nextExerciseIndex },
-                });
-              } else {
-                router.back();
-              }
-            }, 3000);
-          });
-        };
-
-        const resetOnset = () => {
-          if (Platform.OS !== "web") {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          }
-
-          currentOnsetScaleRef.current = 1;
-          Animated.parallel([
-            Animated.spring(onsetPosition, {
-              toValue: { x: 0, y: 0 },
-              useNativeDriver: false,
-            }),
-            Animated.spring(onsetScale, {
-              toValue: 1,
-              useNativeDriver: false,
-            }),
-          ]).start();
-        };
-
-        attemptCollisionDecision();
+        const sat = SAT.collides(onsetBody as Matter.Body, rimeBody as Matter.Body);
+        if (sat.collided) {
+          runOnJS(handleSuccessJS)();
+        } else {
+          runOnJS(resetOnsetJS)();
+        }
       },
     })
   ).current;
 
-  if (!exercise || exercise.exercise_type !== "Sound Slide") {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Exercise not found</Text>
-      </View>
+  const flashAnimatedStyle = useAnimatedStyle(() => {
+    const bg = interpolateColor(
+      flash.value,
+      [0, 1],
+      ['rgba(255,211,61,0)', 'rgba(255,211,61,0.3)']
     );
-  }
-
-  const flashColor = flashAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['rgba(255, 211, 61, 0)', 'rgba(255, 211, 61, 0.3)'],
-  });
+    return { backgroundColor: bg } as const;
+  }, [flash]);
 
   const isLandscape = width > height;
   const tileSize = isLandscape ? 80 : 120;
   const spacing = isLandscape ? width * 0.15 : width * 0.1;
 
+  const onsetAnimatedStyle = useAnimatedStyle(() => ({
+    width: tileSize,
+    height: tileSize,
+    borderRadius: tileSize * 0.2,
+    transform: [
+      { translateX: onsetX.value },
+      { translateY: onsetY.value },
+      { scale: onsetScale.value },
+    ],
+  }), [tileSize, onsetX, onsetY, onsetScale]);
+
+  const rimeAnimatedStyle = useAnimatedStyle(() => ({
+    width: tileSize,
+    height: tileSize,
+    borderRadius: tileSize * 0.2,
+    transform: [{ scale: rimeScale.value }],
+  }), [tileSize, rimeScale]);
+
   return (
     <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <Animated.View 
-        style={[
-          styles.flashOverlay,
-          { backgroundColor: flashColor }
-        ]} 
+        style={[styles.flashOverlay, flashAnimatedStyle]} 
         pointerEvents="none"
       />
       <View style={styles.header}>
@@ -358,26 +308,28 @@ export default function SoundSlideScreen() {
                 <Animated.View
                   style={[
                     styles.onsetTile,
-                    isPlayingOnset && styles.tilePlaying,
-                    showSuccess && styles.tileSuccess,
-                    {
-                      width: tileSize,
-                      height: tileSize,
-                      borderRadius: tileSize * 0.2,
-                      transform: [
-                        { translateX: onsetPosition.x },
-                        { translateY: onsetPosition.y },
-                        { scale: onsetScale },
-                      ],
-                    },
+                    isPlayingOnset ? styles.tilePlaying : null,
+                    showSuccess ? styles.tileSuccess : null,
+                    onsetAnimatedStyle,
                   ]}
                   testID="onset-tile"
-                  ref={(v: View | null) => { onsetRef.current = v; }}
+                  ref={onsetRef}
                   {...panResponder.panHandlers}
                   onLayout={(event) => {
                     const { x, y, width: w, height: h } = event.nativeEvent.layout;
                     onsetLayoutRef.current = { x, y, width: w, height: h };
                     console.log('[SoundSlide] Onset layout (onLayout):', { x, y, width: w, height: h });
+                    const engine = engineRef.current;
+                    if (engine) {
+                      const cx = x + w / 2;
+                      const cy = y + h / 2;
+                      if (!onsetBodyRef.current) {
+                        onsetBodyRef.current = Bodies.rectangle(cx, cy, w, h, { isStatic: false, label: 'onset' });
+                        Composite.add(engine.world, onsetBodyRef.current);
+                      } else {
+                        Body.setPosition(onsetBodyRef.current, { x: cx, y: cy });
+                      }
+                    }
                   }}
                 >
                   <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.onset}</Text>
@@ -396,24 +348,28 @@ export default function SoundSlideScreen() {
                   testID="rime-tile"
                   style={[
                     styles.rimeTile,
-                    isPlayingRime && styles.tilePlaying,
-                    showSuccess && styles.tileSuccess,
-                    {
-                      width: tileSize,
-                      height: tileSize,
-                      borderRadius: tileSize * 0.2,
-                      transform: [{ scale: rimeScale }],
-                    },
+                    isPlayingRime ? styles.tilePlaying : null,
+                    showSuccess ? styles.tileSuccess : null,
+                    rimeAnimatedStyle,
                   ]}
-                  ref={(r: View | null) => {
-                    rimeRef.current = r;
-                  }}
+                  ref={rimeRef}
                   onLayout={() => {
                     try {
                       requestAnimationFrame(() => {
                         rimeRef.current?.measureInWindow((pageX, pageY, w, h) => {
                           rimeZoneLayout.current = { pageX, pageY, width: w, height: h };
                           console.log('[SoundSlide] Rime drop zone layout (absolute):', rimeZoneLayout.current);
+                          const engine = engineRef.current;
+                          if (engine) {
+                            const cx = pageX + w / 2;
+                            const cy = pageY + h / 2;
+                            if (!rimeBodyRef.current) {
+                              rimeBodyRef.current = Bodies.rectangle(cx, cy, w, h, { isStatic: true, label: 'rime' });
+                              Composite.add(engine.world, rimeBodyRef.current);
+                            } else {
+                              Body.setPosition(rimeBodyRef.current, { x: cx, y: cy });
+                            }
+                          }
                         });
                       });
                     } catch (e) {
