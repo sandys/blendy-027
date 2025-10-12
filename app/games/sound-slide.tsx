@@ -300,10 +300,12 @@ export default function SoundSlideScreen() {
                   ]}
                   {...panResponder.panHandlers}
                   onLayout={(event) => {
-                    event.currentTarget.measure((fx, fy, w, h, pageX, pageY) => {
-                      onsetLayoutRef.current = { x: pageX, y: pageY, width: w, height: h };
-                      console.log('[SoundSlide] Onset layout:', { x: pageX, y: pageY, width: w, height: h });
-                    });
+                    setTimeout(() => {
+                      event.currentTarget.measureInWindow((x, y, w, h) => {
+                        onsetLayoutRef.current = { x, y, width: w, height: h };
+                        console.log('[SoundSlide] Onset layout (measureInWindow):', { x, y, width: w, height: h });
+                      });
+                    }, 100);
                   }}
                 >
                   <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.onset}</Text>
@@ -331,10 +333,12 @@ export default function SoundSlideScreen() {
                     },
                   ]}
                   onLayout={(event) => {
-                    event.currentTarget.measure((fx, fy, w, h, pageX, pageY) => {
-                      rimeLayoutRef.current = { x: pageX, y: pageY, width: w, height: h };
-                      console.log('[SoundSlide] Rime layout:', { x: pageX, y: pageY, width: w, height: h });
-                    });
+                    setTimeout(() => {
+                      event.currentTarget.measureInWindow((x, y, w, h) => {
+                        rimeLayoutRef.current = { x, y, width: w, height: h };
+                        console.log('[SoundSlide] Rime layout (measureInWindow):', { x, y, width: w, height: h });
+                      });
+                    }, 100);
                   }}
                 >
                   <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.rime}</Text>
