@@ -47,6 +47,7 @@ export default function WordBuilderScreen() {
   const audioLoopRef = useRef<boolean>(true);
   const isCorrectAnswerGiven = useRef<boolean>(false);
   const dropZoneLayout = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const letterLayoutsRef = useRef<Map<number, { x: number; y: number; width: number; height: number }>>(new Map());
   const flashAnim = useRef(new Animated.Value(0)).current;
 
   const isLandscape = width > height;
@@ -164,15 +165,25 @@ export default function WordBuilderScreen() {
           return;
         }
 
+        const letterLayout = letterLayoutsRef.current.get(letterIndex);
+        if (!letterLayout) {
+          Animated.spring(draggableLetters[letterIndex].position, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: false,
+            friction: 5,
+          }).start();
+          return;
+        }
+
         const dropZone = dropZoneLayout.current;
-        const absoluteX = evt.nativeEvent.pageX;
-        const absoluteY = evt.nativeEvent.pageY;
+        const letterCenterX = letterLayout.x + letterLayout.width / 2 + gesture.dx;
+        const letterCenterY = letterLayout.y + letterLayout.height / 2 + gesture.dy;
 
         const isInDropZone =
-          absoluteX >= dropZone.x &&
-          absoluteX <= dropZone.x + dropZone.width &&
-          absoluteY >= dropZone.y &&
-          absoluteY <= dropZone.y + dropZone.height;
+          letterCenterX >= dropZone.x &&
+          letterCenterX <= dropZone.x + dropZone.width &&
+          letterCenterY >= dropZone.y &&
+          letterCenterY <= dropZone.y + dropZone.height;
 
         if (isInDropZone) {
           if (Platform.OS !== "web") {
@@ -343,6 +354,11 @@ export default function WordBuilderScreen() {
                           ],
                         },
                       ]}
+                      onLayout={(event) => {
+                        event.target.measure((x, y, width, height, pageX, pageY) => {
+                          letterLayoutsRef.current.set(index, { x: pageX, y: pageY, width, height });
+                        });
+                      }}
                     >
                       <Text style={[styles.letterText, { fontSize: tileSize * 0.44 }]}>
                         {draggableLetter.letter}

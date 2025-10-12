@@ -41,6 +41,8 @@ export default function SoundSlideScreen() {
   const onsetPosition = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const onsetScale = useRef(new Animated.Value(1)).current;
   const rimeScale = useRef(new Animated.Value(1)).current;
+  const onsetLayoutRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const rimeLayoutRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
 
   useEffect(() => {
     if (!exerciseData) return;
@@ -110,15 +112,38 @@ export default function SoundSlideScreen() {
         [null, { dx: onsetPosition.x, dy: onsetPosition.y }],
         { useNativeDriver: false }
       ),
-      onPanResponderRelease: (_, gestureState) => {
-        const targetX = width * 0.5;
-        const targetY = height * 0.5;
+      onPanResponderRelease: (evt, gestureState) => {
+        if (!onsetLayoutRef.current || !rimeLayoutRef.current) {
+          Animated.parallel([
+            Animated.spring(onsetPosition, {
+              toValue: { x: 0, y: 0 },
+              useNativeDriver: true,
+            }),
+            Animated.spring(onsetScale, {
+              toValue: 1,
+              useNativeDriver: true,
+            }),
+          ]).start();
+          return;
+        }
+
+        const onsetLayout = onsetLayoutRef.current;
+        const rimeLayout = rimeLayoutRef.current;
+        
+        const onsetCenterX = onsetLayout.x + onsetLayout.width / 2 + gestureState.dx;
+        const onsetCenterY = onsetLayout.y + onsetLayout.height / 2 + gestureState.dy;
+        
+        const rimeCenterX = rimeLayout.x + rimeLayout.width / 2;
+        const rimeCenterY = rimeLayout.y + rimeLayout.height / 2;
+        
         const distance = Math.sqrt(
-          Math.pow(gestureState.moveX - targetX, 2) +
-            Math.pow(gestureState.moveY - targetY, 2)
+          Math.pow(onsetCenterX - rimeCenterX, 2) +
+            Math.pow(onsetCenterY - rimeCenterY, 2)
         );
 
-        if (distance < 100) {
+        const threshold = Math.max(onsetLayout.width, onsetLayout.height) * 0.8;
+
+        if (distance < threshold) {
           isCorrectAnswerGiven.current = true;
           audioLoopRef.current = false;
           setIsPlayingOnset(false);
@@ -248,6 +273,11 @@ export default function SoundSlideScreen() {
                     },
                   ]}
                   {...panResponder.panHandlers}
+                  onLayout={(event) => {
+                    event.target.measure((x, y, width, height, pageX, pageY) => {
+                      onsetLayoutRef.current = { x: pageX, y: pageY, width, height };
+                    });
+                  }}
                 >
                   <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.onset}</Text>
                   {isPlayingOnset && (
@@ -273,6 +303,11 @@ export default function SoundSlideScreen() {
                       transform: [{ scale: rimeScale }],
                     },
                   ]}
+                  onLayout={(event) => {
+                    event.target.measure((x, y, width, height, pageX, pageY) => {
+                      rimeLayoutRef.current = { x: pageX, y: pageY, width, height };
+                    });
+                  }}
                 >
                   <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.rime}</Text>
                   {isPlayingRime && (
