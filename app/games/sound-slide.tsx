@@ -108,6 +108,7 @@ export default function SoundSlideScreen() {
       onStartShouldSetPanResponder: () => stage === "initial",
       onMoveShouldSetPanResponder: () => stage === "initial",
       onPanResponderGrant: () => {
+        console.log('[SoundSlide] Pan responder grant - starting drag');
         if (Platform.OS !== "web") {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
@@ -116,11 +117,12 @@ export default function SoundSlideScreen() {
           useNativeDriver: true,
         }).start();
       },
-      onPanResponderMove: Animated.event(
-        [null, { dx: onsetPosition.x, dy: onsetPosition.y }],
-        { useNativeDriver: false }
-      ),
+      onPanResponderMove: (evt, gestureState) => {
+        console.log('[SoundSlide] Pan responder move:', { dx: gestureState.dx, dy: gestureState.dy });
+        onsetPosition.setValue({ x: gestureState.dx, y: gestureState.dy });
+      },
       onPanResponderRelease: (evt, gestureState) => {
+        console.log('[SoundSlide] Pan responder release:', { dx: gestureState.dx, dy: gestureState.dy });
         const onsetLayout = onsetLayoutRef.current;
         const rimeLayout = rimeLayoutRef.current;
         
@@ -153,7 +155,7 @@ export default function SoundSlideScreen() {
             Math.pow(onsetCenterY - rimeCenterY, 2)
         );
 
-        const threshold = (onsetLayout.width + rimeLayout.width) / 2;
+        const threshold = (onsetLayout.width + rimeLayout.width) / 3;
         
         console.log('[SoundSlide] Collision check:', {
           distance,
