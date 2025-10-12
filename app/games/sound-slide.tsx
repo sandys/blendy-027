@@ -41,14 +41,14 @@ export default function SoundSlideScreen() {
   const onsetPosition = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const onsetScale = useRef(new Animated.Value(1)).current;
   const rimeScale = useRef(new Animated.Value(1)).current;
-  const onsetLayoutRef = useRef<{ x: number; y: number; width: number; height: number }>({ x: 0, y: 0, width: 0, height: 0 });
-  const rimeLayoutRef = useRef<{ x: number; y: number; width: number; height: number }>({ x: 0, y: 0, width: 0, height: 0 });
+  const onsetLayoutRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const rimeLayoutRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
 
   useEffect(() => {
     if (!exerciseData) return;
 
-    onsetLayoutRef.current = { x: 0, y: 0, width: 0, height: 0 };
-    rimeLayoutRef.current = { x: 0, y: 0, width: 0, height: 0 };
+    onsetLayoutRef.current = null;
+    rimeLayoutRef.current = null;
     audioLoopRef.current = true;
     isCorrectAnswerGiven.current = false;
     setStage("initial");
@@ -124,7 +124,7 @@ export default function SoundSlideScreen() {
         const onsetLayout = onsetLayoutRef.current;
         const rimeLayout = rimeLayoutRef.current;
         
-        if (!onsetLayout.width || !rimeLayout.width) {
+        if (!onsetLayout || !rimeLayout) {
           console.log('[SoundSlide] Layout not ready, resetting position');
           Animated.parallel([
             Animated.spring(onsetPosition, {
@@ -139,8 +139,11 @@ export default function SoundSlideScreen() {
           return;
         }
         
-        const onsetCenterX = onsetLayout.x + onsetLayout.width / 2 + gestureState.dx;
-        const onsetCenterY = onsetLayout.y + onsetLayout.height / 2 + gestureState.dy;
+        const onsetCurrentX = onsetLayout.x + gestureState.dx;
+        const onsetCurrentY = onsetLayout.y + gestureState.dy;
+        
+        const onsetCenterX = onsetCurrentX + onsetLayout.width / 2;
+        const onsetCenterY = onsetCurrentY + onsetLayout.height / 2;
         
         const rimeCenterX = rimeLayout.x + rimeLayout.width / 2;
         const rimeCenterY = rimeLayout.y + rimeLayout.height / 2;
@@ -150,16 +153,18 @@ export default function SoundSlideScreen() {
             Math.pow(onsetCenterY - rimeCenterY, 2)
         );
 
-        const threshold = Math.max(onsetLayout.width, onsetLayout.height) * 0.8;
+        const threshold = (onsetLayout.width + rimeLayout.width) / 2;
         
         console.log('[SoundSlide] Collision check:', {
           distance,
           threshold,
+          onsetCurrent: { x: onsetCurrentX, y: onsetCurrentY },
           onsetCenter: { x: onsetCenterX, y: onsetCenterY },
           rimeCenter: { x: rimeCenterX, y: rimeCenterY },
           onsetLayout,
           rimeLayout,
-          gestureState: { dx: gestureState.dx, dy: gestureState.dy }
+          gestureState: { dx: gestureState.dx, dy: gestureState.dy },
+          isColliding: distance < threshold
         });
 
         if (distance < threshold) {
