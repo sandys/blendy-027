@@ -43,6 +43,7 @@ export default function SoundSlideScreen() {
   const [isPlayingRime, setIsPlayingRime] = useState<boolean>(false);
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
   const [showDebugGrid, setShowDebugGrid] = useState<boolean>(__DEV__);
+  const [showDebugNumbers, setShowDebugNumbers] = useState<boolean>(__DEV__);
   const [useFlexLayout, setUseFlexLayout] = useState<boolean>(false);
 
   const engineRef = useRef<any | null>(null);
@@ -395,6 +396,9 @@ export default function SoundSlideScreen() {
           <Pressable testID="toggle-grid" accessibilityRole="button" onPress={() => setShowDebugGrid((v) => !v)} style={styles.gridToggle} hitSlop={8}>
             <Text style={styles.gridToggleText}>{showDebugGrid ? "Hide grid" : "Show grid"}</Text>
           </Pressable>
+          <Pressable testID="toggle-numbers" accessibilityRole="button" onPress={() => setShowDebugNumbers((v) => !v)} style={[styles.gridToggle, { marginLeft: 8 }]} hitSlop={8}>
+            <Text style={styles.gridToggleText}>{showDebugNumbers ? "Hide numbers" : "Show numbers"}</Text>
+          </Pressable>
           <Pressable testID="toggle-layout" accessibilityRole="button" onPress={() => setUseFlexLayout((v) => !v)} style={[styles.gridToggle, { marginLeft: 8 }]} hitSlop={8}>
             <Text style={styles.gridToggleText}>{useFlexLayout ? "Absolute layout" : "Flex layout"}</Text>
           </Pressable>
@@ -405,6 +409,7 @@ export default function SoundSlideScreen() {
         <View
           style={[styles.board, isLandscape ? { aspectRatio: 16 / 9, width: "100%" } : { width: "100%", height: "100%" }]}
           ref={gameAreaRef}
+          pointerEvents="box-none"
           onLayout={(e: LayoutChangeEvent) => {
             const { x, y, width: w, height: h } = e.nativeEvent.layout;
             console.log('[SoundSlide] onLayout(board)', { x, y, w, h });
@@ -427,6 +432,38 @@ export default function SoundSlideScreen() {
                 ))}
               </View>
               <View style={styles.boardBounds} />
+              {showDebugNumbers && (
+                <View style={styles.debugNumbers} testID="debug-numbers">
+                  <Text style={styles.debugText}>board: {gameLayout.current?.width ?? 0} x {gameLayout.current?.height ?? 0}</Text>
+                  <Text style={styles.debugText}>tileSize: {tileSize}</Text>
+                  <Text style={styles.debugText}>marginPx: {Math.max(12, Math.round(tileSize * 0.25))}</Text>
+                  <Text style={styles.debugText}>boundsX: {gameLayout.current ? Math.round(Math.max(12, tileSize * 0.25) + tileSize/2) : 0} - {gameLayout.current ? Math.round((gameLayout.current.width - Math.max(12, tileSize * 0.25) - tileSize/2)) : 0}</Text>
+                  <Text style={styles.debugText}>boundsY: {gameLayout.current ? Math.round(Math.max(12, tileSize * 0.25) + tileSize/2) : 0} - {gameLayout.current ? Math.round((gameLayout.current.height - Math.max(12, tileSize * 0.25) - tileSize/2)) : 0}</Text>
+                  <Text style={styles.debugText}>onset(px): {Math.round(onsetX.value)}, {Math.round(onsetY.value)} | rime(px): {Math.round(rimeX.value)}, {Math.round(rimeY.value)}</Text>
+                  <Text style={styles.debugText}>onset(norm): {onsetNormRef.current.x.toFixed(3)}, {onsetNormRef.current.y.toFixed(3)}</Text>
+                  <Text style={styles.debugText}>rime(norm): {rimeNormRef.current.x.toFixed(3)}, {rimeNormRef.current.y.toFixed(3)}</Text>
+                  <Text style={styles.debugText}>size(norm): {sizeNormRef.current.w.toFixed(3)} x {sizeNormRef.current.h.toFixed(3)}</Text>
+                </View>
+              )}
+              {/* target center markers */}
+              {gameLayout.current && (
+                <>
+                  <View
+                    pointerEvents="none"
+                    style={{ position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: 'rgba(255,107,157,0.9)', transform: [
+                      { translateX: onsetNormRef.current.x * (gameLayout.current.width) - 5 },
+                      { translateY: onsetNormRef.current.y * (gameLayout.current.height) - 5 },
+                    ] }}
+                  />
+                  <View
+                    pointerEvents="none"
+                    style={{ position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: 'rgba(78,205,196,0.9)', transform: [
+                      { translateX: rimeNormRef.current.x * (gameLayout.current.width) - 5 },
+                      { translateY: rimeNormRef.current.y * (gameLayout.current.height) - 5 },
+                    ] }}
+                  />
+                </>
+              )}
             </View>
           )}
 
@@ -508,7 +545,7 @@ export default function SoundSlideScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFF8E1" },
-  header: { paddingVertical: 12, paddingHorizontal: 20, alignItems: "center", position: 'relative', zIndex: 10, elevation: 2 },
+  header: { paddingVertical: 12, paddingHorizontal: 20, alignItems: "center", position: 'relative', zIndex: 2000, elevation: 6, backgroundColor: '#FFF8E1' },
   headerButtonsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
   instructionText: { fontWeight: "700" as const, color: "#FFD93D", textAlign: "center", marginBottom: 8 },
   progressText: { color: "#999", fontWeight: "600" as const },
@@ -583,4 +620,6 @@ const styles = StyleSheet.create({
   gridRowsCol: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, justifyContent: "space-between" },
   gridRow: { height: 1, backgroundColor: "rgba(0,0,0,0.08)" },
   boardBounds: { position: "absolute", top: 8, bottom: 8, left: 8, right: 8, borderColor: "rgba(255,0,0,0.35)", borderWidth: 2, borderStyle: "dashed" as const, borderRadius: 12 },
+  debugNumbers: { position: 'absolute', left: 8, bottom: 8, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8 },
+  debugText: { color: '#fff', fontSize: 11, fontWeight: '700' as const, lineHeight: 14 },
 });
