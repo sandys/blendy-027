@@ -222,8 +222,11 @@ export default function SoundSlideScreen() {
 
           const rimeBody = rimeBodyRef.current;
           if (rimeBody) {
-            const sat = SAT.collides(onsetBody as any, rimeBody as any);
-            const hovering = sat.collided === true;
+            const sat = SAT.collides(onsetBody as any, rimeBody as any) as { collided?: boolean } | null;
+            const hovering = !!(sat?.collided === true);
+            if (!sat) {
+              console.log('[SoundSlide] SAT.collides returned null during move');
+            }
             rimeScale.value = withTiming(hovering ? 1.05 : 1, { duration: 120 });
           }
         }
@@ -243,8 +246,12 @@ export default function SoundSlideScreen() {
         Body.setPosition(onsetBody, { x: baseLeft + gestureState.dx, y: baseTop + gestureState.dy });
         Engine.update(engine, 16);
 
-        const sat = SAT.collides(onsetBody as any, rimeBody as any);
-        if (sat.collided) {
+        const sat = SAT.collides(onsetBody as any, rimeBody as any) as { collided?: boolean } | null;
+        const didCollide = !!(sat?.collided === true);
+        if (!sat) {
+          console.log('[SoundSlide] SAT.collides returned null on release');
+        }
+        if (didCollide) {
           runOnJS(handleSuccessJS)();
         } else {
           runOnJS(resetOnsetJS)();
