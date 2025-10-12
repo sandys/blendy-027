@@ -367,60 +367,61 @@ export default function SoundSlideScreen() {
   return (
     <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <Animated.View style={[styles.flashOverlay, flashAnimatedStyle]} pointerEvents="none" />
-      <View style={styles.header}>
+      <View style={styles.header} testID="header">
         <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 14 }]}>Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}</Text>
         <Text style={[styles.instructionText, { fontSize: isLandscape ? Math.max(14, width * 0.018) : Math.max(18, width * 0.04), marginTop: 4 }]}>Drag the sounds together to make a word!</Text>
       </View>
 
-      <View
-        style={styles.gameArea}
-        ref={gameAreaRef}
-        onLayout={(e: LayoutChangeEvent) => {
-          const { x, y, width: w, height: h } = e.nativeEvent.layout;
-          console.log('[SoundSlide] onLayout', { x, y, w, h });
-          // Guard against transient zero sizes that can happen during rotation
-          if (w <= 0 || h <= 0) return;
-          gameLayout.current = { x, y, width: w, height: h };
-          layoutBodies({ x, y, width: w, height: h });
-        }}
-      >
-        {stage === "initial" && !!gameLayout.current && (
-          <>
-            <Animated.View
-              testID="onset-tile"
-              style={[styles.onsetTile, isPlayingOnset ? styles.tilePlaying : null, showSuccess ? styles.tileSuccess : null, onsetAnimatedStyle]}
-              {...panResponder.panHandlers}
-            >
-              <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.onset}</Text>
-              {isPlayingOnset && (
-                <View style={[styles.audioIndicator, { padding: Math.max(4, tileSize * 0.08) }]}>
-                  <Volume2 size={Math.max(16, tileSize * 0.25)} color="#FFFFFF" />
-                </View>
-              )}
-            </Animated.View>
+      <View style={styles.boardOuter}>
+        <View
+          style={[styles.board, isLandscape ? { aspectRatio: 16 / 9, width: '100%' } : { width: '100%', height: '100%' }]}
+          ref={gameAreaRef}
+          onLayout={(e: LayoutChangeEvent) => {
+            const { x, y, width: w, height: h } = e.nativeEvent.layout;
+            console.log('[SoundSlide] onLayout(board)', { x, y, w, h });
+            if (w <= 0 || h <= 0) return;
+            gameLayout.current = { x, y, width: w, height: h };
+            layoutBodies({ x, y, width: w, height: h });
+          }}
+        >
+          {stage === "initial" && !!gameLayout.current && (
+            <>
+              <Animated.View
+                testID="onset-tile"
+                style={[styles.onsetTile, isPlayingOnset ? styles.tilePlaying : null, showSuccess ? styles.tileSuccess : null, onsetAnimatedStyle]}
+                {...panResponder.panHandlers}
+              >
+                <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.onset}</Text>
+                {isPlayingOnset && (
+                  <View style={[styles.audioIndicator, { padding: Math.max(4, tileSize * 0.08) }]}>
+                    <Volume2 size={Math.max(16, tileSize * 0.25)} color="#FFFFFF" />
+                  </View>
+                )}
+              </Animated.View>
 
-            <Animated.View
-              testID="rime-tile"
-              style={[styles.rimeTile, isPlayingRime ? styles.tilePlaying : null, showSuccess ? styles.tileSuccess : null, rimeAnimatedStyle]}
-            >
-              <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.rime}</Text>
-              {isPlayingRime && (
-                <View style={[styles.audioIndicator, { padding: Math.max(4, tileSize * 0.08) }]}>
-                  <Volume2 size={Math.max(16, tileSize * 0.25)} color="#FFFFFF" />
-                </View>
-              )}
-            </Animated.View>
-          </>
-        )}
+              <Animated.View
+                testID="rime-tile"
+                style={[styles.rimeTile, isPlayingRime ? styles.tilePlaying : null, showSuccess ? styles.tileSuccess : null, rimeAnimatedStyle]}
+              >
+                <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.rime}</Text>
+                {isPlayingRime && (
+                  <View style={[styles.audioIndicator, { padding: Math.max(4, tileSize * 0.08) }]}>
+                    <Volume2 size={Math.max(16, tileSize * 0.25)} color="#FFFFFF" />
+                  </View>
+                )}
+              </Animated.View>
+            </>
+          )}
 
-        {stage === "merged" && (
-          <View style={styles.mergedContainer}>
-            <View style={[styles.wordCard, { padding: isLandscape ? Math.max(20, width * 0.03) : Math.max(28, width * 0.06) }]}>
-              <Text style={[styles.wordEmoji, { fontSize: isLandscape ? 70 : 100 }]}>{exerciseData?.image}</Text>
-              <Text style={[styles.wordText, { fontSize: isLandscape ? 40 : 56 }]}>{exerciseData?.word}</Text>
+          {stage === "merged" && (
+            <View style={styles.mergedContainer}>
+              <View style={[styles.wordCard, { padding: isLandscape ? Math.max(20, width * 0.03) : Math.max(28, width * 0.06) }]}>
+                <Text style={[styles.wordEmoji, { fontSize: isLandscape ? 70 : 100 }]}>{exerciseData?.image}</Text>
+                <Text style={[styles.wordText, { fontSize: isLandscape ? 40 : 56 }]}>{exerciseData?.word}</Text>
+              </View>
             </View>
-          </View>
-        )}
+          )}
+        </View>
       </View>
 
       {showFeedback && (
@@ -438,7 +439,8 @@ const styles = StyleSheet.create({
   header: { paddingVertical: 12, paddingHorizontal: 20, alignItems: "center" },
   instructionText: { fontWeight: "700" as const, color: "#FFD93D", textAlign: "center", marginBottom: 8 },
   progressText: { color: "#999", fontWeight: "600" as const },
-  gameArea: { flex: 1, justifyContent: "center", alignItems: "center", position: "relative" as const },
+  boardOuter: { flex: 1, justifyContent: "center", alignItems: "center" },
+  board: { justifyContent: "center", alignItems: "center", position: "relative" as const, maxWidth: 900, width: '100%' },
   onsetTile: {
     backgroundColor: "#FF6B9D",
     justifyContent: "center",
