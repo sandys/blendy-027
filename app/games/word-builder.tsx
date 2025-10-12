@@ -139,7 +139,7 @@ export default function WordBuilderScreen() {
         }
         Animated.spring(draggableLetters[letterIndex].scale, {
           toValue: 1.1,
-          useNativeDriver: true,
+          useNativeDriver: false,
           friction: 3,
         }).start();
       },
@@ -152,7 +152,7 @@ export default function WordBuilderScreen() {
       onPanResponderRelease: (evt, gesture) => {
         Animated.spring(draggableLetters[letterIndex].scale, {
           toValue: 1,
-          useNativeDriver: true,
+          useNativeDriver: false,
           friction: 3,
         }).start();
 
