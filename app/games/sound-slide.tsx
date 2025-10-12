@@ -47,8 +47,16 @@ export default function SoundSlideScreen() {
   useEffect(() => {
     if (!exerciseData) return;
 
+    onsetLayoutRef.current = null;
+    rimeLayoutRef.current = null;
     audioLoopRef.current = true;
     isCorrectAnswerGiven.current = false;
+    setStage("initial");
+    setShowFeedback(false);
+    setShowSuccess(false);
+    onsetPosition.setValue({ x: 0, y: 0 });
+    onsetScale.setValue(1);
+    rimeScale.setValue(1);
 
     const playInitialFeedback = async () => {
       Animated.sequence([
@@ -94,7 +102,7 @@ export default function SoundSlideScreen() {
     return () => {
       audioLoopRef.current = false;
     };
-  }, [exerciseIndex, exerciseData, flashAnim]);
+  }, [exerciseIndex, exerciseData, flashAnim, onsetPosition, onsetScale, rimeScale]);
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => stage === "initial",
@@ -253,7 +261,7 @@ export default function SoundSlideScreen() {
       <View style={styles.gameArea}>
         {stage === "initial" && (
           <>
-            <View style={styles.tilesRow}>
+            <View key={`tiles-${exerciseIndex}`} style={styles.tilesRow}>
               <View style={styles.tileWrapper}>
                 <Text style={[styles.guideText, { fontSize: isLandscape ? 12 : 16, marginBottom: 8 }]}>👆 Drag me →</Text>
                 <Animated.View
