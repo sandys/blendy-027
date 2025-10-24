@@ -378,6 +378,8 @@ export default function SoundSlideScreen() {
 
   const onsetAnimatedStyle = useAnimatedStyle(() => ({
     position: "absolute" as const,
+    left: 0,
+    top: 0,
     width: tileSize,
     height: tileSize,
     borderRadius: tileSize * 0.2,
@@ -390,6 +392,8 @@ export default function SoundSlideScreen() {
 
   const rimeAnimatedStyle = useAnimatedStyle(() => ({
     position: "absolute" as const,
+    left: 0,
+    top: 0,
     width: tileSize,
     height: tileSize,
     borderRadius: tileSize * 0.2,
