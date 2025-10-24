@@ -400,14 +400,18 @@ export default function SoundSlideScreen() {
   return (
     <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
 
-      <View style={styles.header} testID="header" pointerEvents="auto">
+      <View style={styles.header} testID="header">
         <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 14 }]}>Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}</Text>
         <Text style={[styles.instructionText, { fontSize: isLandscape ? Math.max(14, width * 0.018) : Math.max(18, width * 0.04), marginTop: 4 }]}>Drag the sounds together to make a word!</Text>
-        <View style={styles.headerButtonsRow}>
-          <Pressable testID="toggle-grid" accessibilityRole="button" onPress={() => setShowDebugGrid((v) => !v)} style={styles.gridToggle} hitSlop={8}>
+        <View style={styles.headerButtonsRow} pointerEvents="box-none">
+          <Pressable testID="toggle-grid" accessibilityRole="button" onPress={() => {
+            console.log('[SoundSlide] toggle grid clicked');
+            setShowDebugGrid((v) => !v);
+          }} style={styles.gridToggle} hitSlop={20}>
             <Text style={styles.gridToggleText}>{showDebugGrid ? "Hide grid" : "Show grid"}</Text>
           </Pressable>
           <Pressable testID="toggle-numbers" accessibilityRole="button" onPress={() => {
+            console.log('[SoundSlide] toggle numbers clicked');
             setShowDebugNumbers((v) => {
               const next = !v;
               if (next && !showDebugGrid) {
@@ -416,10 +420,13 @@ export default function SoundSlideScreen() {
               }
               return next;
             });
-          }} style={[styles.gridToggle, { marginLeft: 8 }]} hitSlop={8}>
+          }} style={[styles.gridToggle, { marginLeft: 8 }]} hitSlop={20}>
             <Text style={styles.gridToggleText}>{showDebugNumbers ? "Hide numbers" : "Show numbers"}</Text>
           </Pressable>
-          <Pressable testID="toggle-layout" accessibilityRole="button" onPress={() => setUseFlexLayout((v) => !v)} style={[styles.gridToggle, { marginLeft: 8 }]} hitSlop={8}>
+          <Pressable testID="toggle-layout" accessibilityRole="button" onPress={() => {
+            console.log('[SoundSlide] toggle layout clicked');
+            setUseFlexLayout((v) => !v);
+          }} style={[styles.gridToggle, { marginLeft: 8 }]} hitSlop={20}>
             <Text style={styles.gridToggleText}>{useFlexLayout ? "Absolute layout" : "Flex layout"}</Text>
           </Pressable>
         </View>
@@ -565,7 +572,7 @@ export default function SoundSlideScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFF8E1" },
-  header: { paddingVertical: 12, paddingHorizontal: 20, alignItems: "center", position: 'relative', zIndex: 2000, elevation: 6, backgroundColor: '#FFF8E1' },
+  header: { paddingVertical: 12, paddingHorizontal: 20, alignItems: "center", position: 'relative', zIndex: 2000, elevation: 6, backgroundColor: '#FFF8E1', pointerEvents: 'box-none' },
   headerButtonsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
   instructionText: { fontWeight: "700" as const, color: "#FFD93D", textAlign: "center", marginBottom: 8 },
   progressText: { color: "#999", fontWeight: "600" as const },
