@@ -18,6 +18,7 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
+import * as ScreenOrientation from "expo-screen-orientation";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
@@ -67,6 +68,16 @@ export default function SoundSlideScreen() {
   const sizeNormRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
   const audioLoopRef = useRef<boolean>(true);
   const isCorrectAnswerGiven = useRef<boolean>(false);
+
+  useEffect(() => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+    console.log('[SoundSlide] Locked screen to landscape');
+
+    return () => {
+      ScreenOrientation.unlockAsync();
+      console.log('[SoundSlide] Unlocked screen orientation');
+    };
+  }, []);
 
   const tileSize = useMemo(() => {
     const minDim = Math.min(width, height);
