@@ -70,13 +70,19 @@ export default function SoundSlideScreen() {
   const isCorrectAnswerGiven = useRef<boolean>(false);
 
   useEffect(() => {
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-    console.log('[SoundSlide] Locked screen to landscape');
+    if (Platform.OS !== 'web') {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
+        .then(() => console.log('[SoundSlide] Locked screen to landscape'))
+        .catch((error) => console.error('[SoundSlide] Failed to lock orientation:', error));
 
-    return () => {
-      ScreenOrientation.unlockAsync();
-      console.log('[SoundSlide] Unlocked screen orientation');
-    };
+      return () => {
+        ScreenOrientation.unlockAsync()
+          .then(() => console.log('[SoundSlide] Unlocked screen orientation'))
+          .catch((error) => console.error('[SoundSlide] Failed to unlock orientation:', error));
+      };
+    } else {
+      console.log('[SoundSlide] Screen orientation lock skipped on web');
+    }
   }, []);
 
   const tileSize = useMemo(() => {

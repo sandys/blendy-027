@@ -33,13 +33,24 @@ export default function RootLayout() {
       if (Platform.OS !== 'web') {
         try {
           await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT);
+          console.log('Screen orientation locked to landscape');
         } catch (error) {
-          console.log('Orientation lock not available:', error);
+          console.error('Failed to lock orientation:', error);
         }
+      } else {
+        console.log('Screen orientation lock skipped on web');
       }
     };
     lockOrientation();
-    SplashScreen.hideAsync();
+    
+    const hideSplash = async () => {
+      try {
+        await SplashScreen.hideAsync();
+      } catch (error) {
+        console.error('Failed to hide splash screen:', error);
+      }
+    };
+    hideSplash();
   }, []);
 
   return (
