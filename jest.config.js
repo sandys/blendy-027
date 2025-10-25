@@ -16,4 +16,5 @@ module.exports = {
   testMatch: ["**/__tests__/**/*.test.{ts,tsx}"],
   testPathIgnorePatterns: ["<rootDir>/.expo/", "<rootDir>/node_modules/"],
   clearMocks: true,
+  maxWorkers: 1,
 };

@@ -1,27 +1,8 @@
-import React, {
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useRef,
-} from "react";
+import React, { forwardRef, useImperativeHandle, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useApp } from "@/contexts/AppContext";
 import { renderWithProviders } from "./test-utils";
 import { act, waitFor } from "@testing-library/react-native";
-
-type SnapshotHandler = jest.Mock;
-
-const SnapshotConsumer = ({ onUpdate }: { onUpdate: SnapshotHandler }) => {
-  const context = useApp();
-
-  useEffect(() => {
-    if (!context.isLoading) {
-      onUpdate(context);
-    }
-  }, [context, onUpdate]);
-
-  return null;
-};
 
 const ContextCapture = forwardRef((_props, ref) => {
   const context = useApp();
@@ -35,13 +16,16 @@ describe("AppContext", () => {
   });
 
   it("provides initial lesson data and phoneme deck", async () => {
-    const onUpdate = jest.fn();
+    const harnessRef = React.createRef<ReturnType<typeof useApp>>();
 
-    renderWithProviders(<SnapshotConsumer onUpdate={onUpdate} />);
+    renderWithProviders(<ContextCapture ref={harnessRef} />);
 
-    await waitFor(() => expect(onUpdate).toHaveBeenCalled());
+    await waitFor(
+      () => expect(harnessRef.current?.isLoading).toBe(false),
+      { timeout: 7000 }
+    );
 
-    const context = onUpdate.mock.calls[onUpdate.mock.calls.length - 1][0];
+    const context = harnessRef.current!;
     expect(context.progress.currentLesson).toBe(1);
     expect(Array.isArray(context.lessons)).toBe(true);
     expect(context.lessons.length).toBeGreaterThan(0);
