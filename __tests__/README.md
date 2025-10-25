@@ -4,13 +4,13 @@
 
 ```bash
 # Run all tests
-npm test
+bun test
 
 # Run tests in watch mode
-npm run test:watch
+bun test:watch
 
 # Run tests with coverage
-npm run test:coverage
+bun test:coverage
 ```
 
 ## Test Structure
