@@ -15,22 +15,11 @@ npm run test:coverage
 
 ## Test Structure
 
-- `setup.ts` - Jest setup, mocks for Expo modules
-- `test-utils.tsx` - Custom render with AppProvider
-- `unit/` - Unit tests for data, utils, types
-- `components/` - React Native component tests
-
-## Current Tests
-
-**Unit Tests (3):**
-- `curriculum-data.test.ts` - Validates PHASES, LESSONS, PHONEME_CARDS
-- `audio.test.ts` - Audio utility functions
-- `types.test.ts` - TypeScript type validation
-
-**Component Tests (3):**
-- `rhyme-match.test.tsx` - Rhyme matching game rendering
-- `word-tapper.test.tsx` - Word tapping game rendering
-- `word-builder.test.tsx` - Word builder game rendering
+- `jest.setup.ts` - Global Jest setup, Expo/AsyncStorage mocks
+- `test-utils.tsx` - Helpers for rendering within `AppProvider`
+- `audio.test.ts` - Expo audio utility coverage
+- `app-context.test.tsx` - Progress + phoneme logic in context provider
+- `curriculum-data.test.ts` - Curriculum integrity checks
 
 ## CI/CD
 
@@ -55,15 +44,19 @@ test("phases structure", () => {
 });
 ```
 
-**Component Test:**
+**Provider-Aware Render:**
 ```tsx
-import { render, fireEvent } from "../test-utils";
-import MyScreen from "@/app/my-screen";
+import { renderWithProviders } from "../test-utils";
+import { useApp } from "@/contexts/AppContext";
+import { Text } from "react-native";
 
-test("renders and responds to tap", () => {
-  const { getByText } = render(<MyScreen />);
-  const button = getByText("Tap Me");
-  fireEvent.press(button);
-  expect(getByText("Success")).toBeTruthy();
+const ExampleConsumer = () => {
+  const { progress } = useApp();
+  return <Text>{progress.currentLesson}</Text>;
+};
+
+test("reads from app context", () => {
+  const { getByText } = renderWithProviders(<ExampleConsumer />);
+  expect(getByText("1")).toBeTruthy();
 });
 ```
