@@ -182,9 +182,77 @@ Current changesets:
 - 0002: automated tests + CI
 - 0003: update lockfile (after bun install)
 
+## Retrospective: Session Work Completed
+
+### What Was Accomplished
+1. **Data Restructuring** ✅
+   - Split 4029-line curriculum-data.ts into phase files (88% reduction)
+   - Created maintainable structure: phase1.ts, phase2.ts, phase3.ts (empty), phase4.ts (empty)
+   - Main file reduced to 490 lines
+   - All imports/exports working
+
+2. **Automated Testing + CI** ✅
+   - Added Jest + @testing-library/react-native setup
+   - Created 6 tests: 3 unit (data/utils/types) + 3 component (game renders)
+   - GitHub Actions workflow configured
+   - **Critical lesson:** Use `npx jest` not `bun test` - Bun's jest incomplete for React Native
+   - CI strategy: Bun install (fast) → npx jest (proper RN support)
+
+3. **CI Configuration Iterations**
+   - Initial: npm only (failed - no lockfile)
+   - Second: Bun only (failed - bun test doesn't handle RN)
+   - Final: Hybrid (Bun install + npx jest) ✅
+   - Added Node.js + Bun to CI workflow
+
+4. **Documentation** ✅
+   - Created agents.md (project context)
+   - Symlinked claude.md → agents.md
+   - Updated __tests__/README.md with testing guide
+   - Added babel.config.js for jest-expo preset
+
+### Key Learnings
+
+**Testing React Native Apps:**
+- Bun's built-in jest runner incomplete for RN ecosystem
+- Must use real Jest from node_modules via `npx jest`
+- jest-expo preset requires proper Jest, not Bun
+- Component tests need careful mocking (expo modules, router, context)
+
+**CI/CD Best Practices:**
+- Lockfile must be committed and synced
+- Hybrid approach works: fast installer + proper test runner
+- Both Node + Bun can coexist in CI
+- `--frozen-lockfile` critical for reproducible builds
+
+**Code Organization:**
+- Large data files (4000+ lines) hurt maintainability
+- Split by logical boundaries (phases)
+- Keep main export files small (< 500 lines)
+- Use barrel exports for clean imports
+
+### Blockers Resolved
+1. ❌ Missing lockfile → ✅ Noted need to run `bun install` locally
+2. ❌ Bun test failures (RN Flow types) → ✅ Switched to npx jest
+3. ❌ Component test failures → ✅ Simplified tests + proper mocks
+4. ❌ CI using wrong test runner → ✅ Hybrid Bun/Node approach
+
+### Remaining Work
+- [ ] Run `bun install` locally to sync lockfile
+- [ ] Verify tests pass in CI
+- [ ] Build 7 new game types (Phase 3 & 4)
+- [ ] Generate lesson data for L26-55 using AI
+- [ ] Expand test coverage
+
+### Files Changed (4 changesets)
+- `0000-add-agents-context.md` - Added project docs
+- `0001-restructure-lesson-data.md` - Split curriculum data
+- `0002-add-automated-tests.md` - Jest/RTL + CI
+- `0003-update-lockfile-needed.md` - Lockfile sync reminder
+
 ## Next Steps
 1. ✅ Setup automated tests + CI
-2. Build Sound Search game (for digraphs L26-33)
-3. Generate L26-33 data w/ AI
-4. Continue through Phase 3 & 4
-5. Add more comprehensive tests as games built
+2. Run `bun install` to sync lockfile
+3. Build Sound Search game (for digraphs L26-33)
+4. Generate L26-33 data w/ AI
+5. Continue through Phase 3 & 4
+6. Add more comprehensive tests as games built
