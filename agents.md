@@ -249,10 +249,255 @@ Current changesets:
 - `0002-add-automated-tests.md` - Jest/RTL + CI
 - `0003-update-lockfile-needed.md` - Lockfile sync reminder
 
-## Next Steps
+## Multi-Phase Implementation Plan
+
+### Phase 1: Test & Fix Existing (L1-25)
+**Goal:** Ensure L1-25 solid before building on top
+
+**Tasks:**
+1. ✅ Create test utils + setup Jest/RTL
+2. ✅ Write initial tests (6 tests: 3 unit + 3 component)
+3. Run full test suite on all 6 games, document failures
+4. Manual smoke test (landscape iPad + iPhone sizes)
+5. Fix identified bugs
+6. Changeset: `0004-test-fix-phase1-2.md`
+
+**Exit Criteria:** All L1-25 tests pass, no critical bugs
+
+---
+
+### Phase 2A: Sound Search Game (Digraphs)
+**Goal:** Build first Phase 3 game
+
+**Tasks:**
+1. Create `app/games/sound-search.tsx`
+2. Implement:
+   - Show image + partial word w/ blank
+   - 3 digraph bubbles (sh/ch/th)
+   - Tap → bubble floats to blank → complete word
+   - Audio plays completed word
+3. Responsive layout (landscape/flex:1)
+4. Tests for game mechanics
+5. Changeset: `0005-add-sound-search.md`
+
+**Exit Criteria:** Sound Search working, tested
+
+---
+
+### Phase 2B: Generate L26-33 Data (Digraphs)
+**Goal:** Complete digraph lessons w/ real data
+
+**Tasks:**
+1. Use AI w/ Appendix B Prompt 8 → generate exercises
+2. Create lessons in `constants/lessons/phase3.ts`:
+   - L26-27: sh digraph (cash, dish, fish, ship, shop)
+   - L28-29: th digraph (bath, with, that, this, thin)
+   - L30-31: ch digraph (chat, chin, chip, chop, much)
+   - L32-33: ck digraph (duck, kick, lock, neck, rock)
+3. Generate decodable stories via XML prompts (3-5 sentences each)
+4. Validate against TypeScript types
+5. Update Sound Wall phoneme unlocking
+6. Manual test each lesson
+7. Changeset: `0006-add-lessons-26-33.md`
+
+**Exit Criteria:** L26-33 playable, stories included, phonemes unlock
+
+---
+
+### Phase 2C: Blend Flipper Game
+**Goal:** Build game for blends (L34-40)
+
+**Tasks:**
+1. Create `app/games/blend-flipper.tsx`
+2. Implement:
+   - Static rime on right (-amp, -est, -op)
+   - Flipper cycles onsets (c/l/st/tr)
+   - Tap → flip → play word audio
+   - Visual flip animation
+3. Responsive, tests
+4. Changeset: `0007-add-blend-flipper.md`
+
+**Exit Criteria:** Blend Flipper working, tested
+
+---
+
+### Phase 2D: Generate L34-40 Data (Blends)
+**Goal:** Complete blend lessons
+
+**Tasks:**
+1. Use AI w/ Prompt 9 (Blend Flipper) + Word Builder
+2. Create lessons in `phase3.ts`:
+   - L34-36: Final blends (-st, -mp, -nd, -nt, -sk, -ft)
+   - L37-38: S-blends (st, sp, sl, sm, sn)
+   - L39: L-blends (bl, cl, fl, gl, pl)
+   - L40: R-blends (br, cr, dr, fr, gr, pr, tr)
+3. Decodable stories for each group
+4. Validate, test
+5. Changeset: `0008-add-lessons-34-40.md`
+
+**Exit Criteria:** L34-40 playable w/ stories
+
+---
+
+### Phase 2E: Word Sort Game
+**Goal:** Build game for FLOSS/glued sounds (L41-45)
+
+**Tasks:**
+1. Create `app/games/word-sort.tsx`
+2. Implement:
+   - 3 buckets at bottom (FLOSS, -ng words, -nk words)
+   - Word tiles appear at top
+   - Drag to correct bucket
+   - Accept/reject feedback
+3. Responsive, tests
+4. Changeset: `0009-add-word-sort.md`
+
+**Exit Criteria:** Word Sort working, tested
+
+---
+
+### Phase 2F: Generate L41-45 Data (FLOSS + Glued)
+**Goal:** Complete Phase 3
+
+**Tasks:**
+1. Use AI w/ Prompt 10 (Word Sort)
+2. Create lessons in `phase3.ts`:
+   - L41-42: FLOSS rule (puff, hill, mess, buzz)
+   - L43-44: -ng endings (bang, sing, long, hung)
+   - L45: -nk endings (bank, pink, honk, sunk)
+3. Decodable stories
+4. Validate, test full Phase 3 (L26-45)
+5. Changeset: `0010-add-lessons-41-45.md`
+
+**Exit Criteria:** Phase 3 complete (L26-45 all playable)
+
+---
+
+### Phase 3A: Magic Wand Game
+**Goal:** Build VCe game (L46-50)
+
+**Tasks:**
+1. Create `app/games/magic-wand.tsx`
+2. Implement:
+   - CVC word displayed (cap)
+   - Magic wand w/ 'e' on tip
+   - Drag 'e' to end → sparkle animation
+   - Vowel transforms to long vowel (ā)
+   - Play "cape"
+3. Responsive, tests
+4. Changeset: `0011-add-magic-wand.md`
+
+**Exit Criteria:** Magic Wand working, tested
+
+---
+
+### Phase 3B: Generate L46-50 Data (VCe)
+**Goal:** Complete VCe lessons
+
+**Tasks:**
+1. Use AI w/ Prompt 11 (Magic Wand)
+2. Create lessons in `constants/lessons/phase4.ts`:
+   - L46: a_e (cake, name, make, safe, game)
+   - L47: i_e (like, time, five, bike, ride)
+   - L48: o_e (hope, bone, rope, home, note)
+   - L49: u_e (cube, mule, rule, tube, cute)
+   - L50: VCe review (mixed)
+3. CVC→VCe transformation pairs
+4. Decodable stories
+5. Validate, test
+6. Changeset: `0012-add-lessons-46-50.md`
+
+**Exit Criteria:** L46-50 playable w/ VCe mechanic
+
+---
+
+### Phase 3C: Word Surgery + Syllable Split Games
+**Goal:** Build final 2 main games
+
+**Tasks:**
+1. Create `app/games/word-surgery.tsx`:
+   - Compound word w/ dotted line (pancake)
+   - Saw tool drags along line
+   - Split → two tiles (pan | cake)
+   - Play each part + whole
+2. Create `app/games/syllable-split.tsx`:
+   - 2-syllable word (robot)
+   - Tap between letters to split
+   - Correct → splits, labels "Open"/"Closed"
+   - Play each syllable + whole
+3. Responsive, tests for both
+4. Changeset: `0013-add-surgery-syllable.md`
+
+**Exit Criteria:** Both games working, tested
+
+---
+
+### Phase 3D: Generate L51-55 Data (Morphology + Syllables)
+**Goal:** Complete curriculum to L55
+
+**Tasks:**
+1. Use AI w/ Prompts 12-13
+2. Create lessons in `phase4.ts`:
+   - L51: Plurals -s (hats, bugs, tents)
+   - L52: Plurals -es (wishes, boxes, dresses)
+   - L53: Compounds (sunset, hotdog, bathtub) - Word Surgery
+   - L54: Closed syllables (napkin, rabbit) - Syllable Split
+   - L55: Open syllables (tiger, robot, paper) - Syllable Split
+3. Decodable stories
+4. Validate, test
+5. Changeset: `0014-add-lessons-51-55.md`
+
+**Exit Criteria:** ALL 55 lessons playable
+
+---
+
+### Phase 4: Heart Word System (Ongoing)
+**Goal:** Add irregular word teaching
+
+**Tasks:**
+1. Create `app/games/heart-word.tsx`:
+   - Multi-step animation
+   - Sound boxes appear
+   - Graphemes fly into boxes
+   - Heart appears over tricky parts
+2. Add Heart Word exercises throughout curriculum for irregular words
+3. Tests
+4. Changeset: `0015-add-heart-word.md`
+
+**Exit Criteria:** Heart Word mechanic available
+
+---
+
+### Phase 5: Integration & Polish
+**Goal:** Everything working together
+
+**Tasks:**
+1. E2E test all 55 lessons
+2. Verify Sound Wall unlocking throughout
+3. Test progression/navigation flow
+4. Test on multiple screen sizes (iPad Pro, iPad mini, iPhone)
+5. Performance check (lazy loading, etc.)
+6. Update TEST_CASES.md w/ all results
+7. Update README if needed
+8. Changeset: `0016-integration-polish.md`
+
+**Exit Criteria:** App ready for user testing
+
+---
+
+### Phase Summary
+- **Phase 1**: Test/fix foundation (current)
+- **Phase 2A-F**: Complete Phase 3 curriculum (6 sub-phases)
+- **Phase 3A-D**: Complete Phase 4 curriculum (4 sub-phases)
+- **Phase 4**: Heart Word system
+- **Phase 5**: Polish & integration
+
+**Total**: ~14-16 phases, ~16 changesets
+
+Each phase builds on previous, can pause/review between phases.
+
+## Next Steps (Current Phase: 1)
 1. ✅ Setup automated tests + CI
-2. Run `bun install` to sync lockfile
-3. Build Sound Search game (for digraphs L26-33)
-4. Generate L26-33 data w/ AI
-5. Continue through Phase 3 & 4
-6. Add more comprehensive tests as games built
+2. TODO: Expand test coverage for all 6 games
+3. TODO: Manual smoke test + fix bugs
+4. Then: Phase 2A (Sound Search game)
