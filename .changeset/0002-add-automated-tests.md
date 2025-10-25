@@ -2,4 +2,4 @@
 minor
 ---
 
-Add automated tests + GitHub CI: Jest/RTL setup w/ mocks, 6 smoke tests for game renders, Bun workflow runs on push/PR
+Add automated tests + GitHub CI: Jest setup w/ Bun, 3 unit tests (curriculum data, audio utils, types), CI workflow runs on push/PR
