@@ -7,9 +7,9 @@
     "start-web": "bunx rork start -p qy49t8nrjuuhmkngkgciy --web --tunnel",
     "start-web-dev": "DEBUG=expo* bunx rork start -p qy49t8nrjuuhmkngkgciy --web --tunnel",
     "lint": "expo lint",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test": "NODE_ENV=test npx jest",
+    "test:watch": "NODE_ENV=test npx jest --watch",
+    "test:coverage": "NODE_ENV=test npx jest --coverage"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",

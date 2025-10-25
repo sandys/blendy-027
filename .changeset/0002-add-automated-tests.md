@@ -2,4 +2,4 @@
 minor
 ---
 
-Add automated tests + GitHub CI: Jest setup w/ Bun, 3 unit tests (curriculum data, audio utils, types), CI workflow runs on push/PR
+Add automated tests + GitHub CI: Jest/RTL setup, 6 tests (3 unit + 3 component), CI w/ Bun install + npx jest runs on push/PR
