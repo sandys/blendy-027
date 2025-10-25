@@ -13,12 +13,21 @@ const ContextCapture = forwardRef((_props, ref) => {
 describe("AppContext", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it("provides initial lesson data and phoneme deck", async () => {
     const harnessRef = React.createRef<ReturnType<typeof useApp>>();
 
     renderWithProviders(<ContextCapture ref={harnessRef} />);
+
+    await act(async () => {
+      jest.runAllTimers();
+    });
 
     await waitFor(
       () => expect(harnessRef.current?.isLoading).toBe(false),
@@ -37,6 +46,10 @@ describe("AppContext", () => {
     const harnessRef = React.createRef<ReturnType<typeof useApp>>();
 
     renderWithProviders(<ContextCapture ref={harnessRef} />);
+
+    await act(async () => {
+      jest.runAllTimers();
+    });
 
     await waitFor(() => expect(harnessRef.current?.isLoading).toBe(false));
 
