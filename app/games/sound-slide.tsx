@@ -8,15 +8,8 @@ import {
   PanResponder,
   LayoutChangeEvent,
   Pressable,
+  Animated,
 } from "react-native";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
-  interpolateColor,
-  runOnJS,
-} from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -53,13 +46,18 @@ export default function SoundSlideScreen() {
   const rafRef = useRef<number | null>(null);
   const gameAreaRef = useRef<View>(null);
 
-  const onsetX = useSharedValue<number>(0);
-  const onsetY = useSharedValue<number>(0);
-  const onsetScale = useSharedValue<number>(1);
-  const rimeScale = useSharedValue<number>(1);
-  const rimeX = useSharedValue<number>(0);
-  const rimeY = useSharedValue<number>(0);
-  const flash = useSharedValue<number>(0);
+  const onsetXRef = useRef<number>(0);
+  const onsetYRef = useRef<number>(0);
+  const rimeXRef = useRef<number>(0);
+  const rimeYRef = useRef<number>(0);
+
+  const onsetTranslateX = useRef(new Animated.Value(0)).current;
+  const onsetTranslateY = useRef(new Animated.Value(0)).current;
+  const rimeTranslateX = useRef(new Animated.Value(0)).current;
+  const rimeTranslateY = useRef(new Animated.Value(0)).current;
+  const onsetScale = useRef(new Animated.Value(1)).current;
+  const rimeScale = useRef(new Animated.Value(1)).current;
+  const flashOpacity = useRef(new Animated.Value(0)).current;
 
   const gameLayout = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const dragStartCenter = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -101,10 +99,14 @@ export default function SoundSlideScreen() {
     const ox = Math.max(60, width * 0.3);
     const rx = Math.min(width - 60, width * 0.7);
     const cy = height * 0.55;
-    onsetX.value = ox;
-    onsetY.value = cy;
-    rimeX.value = rx;
-    rimeY.value = cy;
+    onsetXRef.current = ox;
+    onsetYRef.current = cy;
+    rimeXRef.current = rx;
+    rimeYRef.current = cy;
+    onsetTranslateX.setValue(ox - tileSize / 2);
+    onsetTranslateY.setValue(cy - tileSize / 2);
+    rimeTranslateX.setValue(rx - tileSize / 2);
+    rimeTranslateY.setValue(cy - tileSize / 2);
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       engineRef.current = null;
@@ -119,13 +121,15 @@ export default function SoundSlideScreen() {
     setStage("initial");
     setShowFeedback(false);
     setShowSuccess(false);
-    onsetScale.value = 1;
-    rimeScale.value = 1;
+    onsetScale.setValue(1);
+    rimeScale.setValue(1);
 
     const play = async () => {
-      flash.value = withTiming(1, { duration: 180 }, () => {
-        flash.value = withTiming(0, { duration: 180 });
-      });
+      flashOpacity.setValue(0);
+      Animated.sequence([
+        Animated.timing(flashOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+        Animated.timing(flashOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+      ]).start();
       if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       await new Promise((r) => setTimeout(r, 300));
       while (audioLoopRef.current && !isCorrectAnswerGiven.current) {
@@ -144,7 +148,7 @@ export default function SoundSlideScreen() {
     return () => {
       audioLoopRef.current = false;
     };
-  }, [exerciseIndex, lessonNumber, exerciseData, flash, onsetScale, rimeScale]);
+  }, [exerciseIndex, lessonNumber, exerciseData]);
 
   const startEngineLoop = () => {
     if (!engineRef.current || !onsetBodyRef.current) return;
@@ -154,16 +158,20 @@ export default function SoundSlideScreen() {
       const ob = onsetBodyRef.current as any;
       const rb = rimeBodyRef.current as any;
       if (ob?.position) {
-        onsetX.value = ob.position.x;
-        onsetY.value = ob.position.y;
+        onsetXRef.current = ob.position.x;
+        onsetYRef.current = ob.position.y;
+        onsetTranslateX.setValue(ob.position.x - tileSize / 2);
+        onsetTranslateY.setValue(ob.position.y - tileSize / 2);
         const gl = gameLayout.current;
         if (gl) {
           onsetNormRef.current = { x: ob.position.x / gl.width, y: ob.position.y / gl.height };
         }
       }
       if (rb?.position) {
-        rimeX.value = rb.position.x;
-        rimeY.value = rb.position.y;
+        rimeXRef.current = rb.position.x;
+        rimeYRef.current = rb.position.y;
+        rimeTranslateX.setValue(rb.position.x - tileSize / 2);
+        rimeTranslateY.setValue(rb.position.y - tileSize / 2);
       }
       rafRef.current = requestAnimationFrame(loop);
     };
@@ -250,10 +258,14 @@ export default function SoundSlideScreen() {
       mode: useFlexLayout ? 'flex' : 'absolute',
     });
 
-    onsetX.value = onsetXpx;
-    onsetY.value = onsetYpx;
-    rimeX.value = rimeXpx;
-    rimeY.value = rimeYpx;
+    onsetXRef.current = onsetXpx;
+    onsetYRef.current = onsetYpx;
+    rimeXRef.current = rimeXpx;
+    rimeYRef.current = rimeYpx;
+    onsetTranslateX.setValue(onsetXpx - tileSize / 2);
+    onsetTranslateY.setValue(onsetYpx - tileSize / 2);
+    rimeTranslateX.setValue(rimeXpx - tileSize / 2);
+    rimeTranslateY.setValue(rimeYpx - tileSize / 2);
   };
 
   const panResponder = useRef(
@@ -262,12 +274,12 @@ export default function SoundSlideScreen() {
       onMoveShouldSetPanResponder: () => stage === "initial" && !!gameLayout.current,
       onPanResponderGrant: () => {
         if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onsetScale.value = withSpring(1.08);
+        Animated.spring(onsetScale, { toValue: 1.08, useNativeDriver: true, friction: 5 }).start();
         if (onsetBodyRef.current) {
           const pos = (onsetBodyRef.current as any).position;
           dragStartCenter.current = { x: pos?.x ?? 0, y: pos?.y ?? 0 };
         } else {
-          dragStartCenter.current = { x: onsetX.value, y: onsetY.value };
+          dragStartCenter.current = { x: onsetXRef.current, y: onsetYRef.current };
         }
         console.log('[SoundSlide] drag start', { start: dragStartCenter.current, mode: useFlexLayout ? 'flex' : 'absolute' });
       },
@@ -291,20 +303,22 @@ export default function SoundSlideScreen() {
           if (rimeBodyRef.current) {
             const result = SAT.collides(onsetBodyRef.current as any, rimeBodyRef.current as any) as { collided?: boolean } | null;
             const hovering = !!(result && result.collided === true);
-            rimeScale.value = withTiming(hovering ? 1.06 : 1, { duration: 120 });
+            Animated.timing(rimeScale, { toValue: hovering ? 1.06 : 1, duration: 120, useNativeDriver: true }).start();
           }
         } else {
-          onsetX.value = nx;
-          onsetY.value = ny;
+          onsetXRef.current = nx;
+          onsetYRef.current = ny;
+          onsetTranslateX.setValue(nx - tileSize / 2);
+          onsetTranslateY.setValue(ny - tileSize / 2);
           onsetNormRef.current = { x: nx / gl.width, y: ny / gl.height };
-          const hovering = Math.abs(nx - rimeX.value) <= tileSize * 0.5 && Math.abs(ny - rimeY.value) <= tileSize * 0.5;
-          rimeScale.value = withTiming(hovering ? 1.06 : 1, { duration: 120 });
+          const hovering = Math.abs(nx - rimeXRef.current) <= tileSize * 0.5 && Math.abs(ny - rimeYRef.current) <= tileSize * 0.5;
+          Animated.timing(rimeScale, { toValue: hovering ? 1.06 : 1, duration: 120, useNativeDriver: true }).start();
         }
         if (__DEV__) console.log('[SoundSlide] drag move', { nx, ny });
       },
       onPanResponderRelease: () => {
         const gl = gameLayout.current;
-        onsetScale.value = withSpring(1);
+        Animated.spring(onsetScale, { toValue: 1, useNativeDriver: true }).start();
         if (!gl) return;
 
         let hit = false;
@@ -314,13 +328,13 @@ export default function SoundSlideScreen() {
           hit = !!(result && result.collided === true);
           console.log('[SoundSlide] release(abs)', { hit });
         } else {
-          const hovering = Math.abs(onsetX.value - rimeX.value) <= tileSize * 0.5 && Math.abs(onsetY.value - rimeY.value) <= tileSize * 0.5;
+          const hovering = Math.abs(onsetXRef.current - rimeXRef.current) <= tileSize * 0.5 && Math.abs(onsetYRef.current - rimeYRef.current) <= tileSize * 0.5;
           hit = hovering;
           console.log('[SoundSlide] release(flex)', { hit });
         }
 
         if (hit) {
-          runOnJS(handleSuccess)();
+          handleSuccess();
         } else {
           const centers = computeCentersNorm(gl);
           onsetNormRef.current = { x: centers.cxLeft, y: centers.cy };
@@ -329,13 +343,15 @@ export default function SoundSlideScreen() {
           if (onsetBodyRef.current && !useFlexLayout) {
             Body.setPosition(onsetBodyRef.current, { x: cx, y: cy });
           }
-          onsetX.value = withSpring(cx);
-          onsetY.value = withSpring(cy);
-          rimeScale.value = withTiming(1, { duration: 120 });
+          onsetXRef.current = cx;
+          onsetYRef.current = cy;
+          Animated.spring(onsetTranslateX, { toValue: cx - tileSize / 2, useNativeDriver: true }).start();
+          Animated.spring(onsetTranslateY, { toValue: cy - tileSize / 2, useNativeDriver: true }).start();
+          Animated.timing(rimeScale, { toValue: 1, duration: 120, useNativeDriver: true }).start();
         }
       },
       onPanResponderTerminate: () => {
-        onsetScale.value = withSpring(1);
+        Animated.spring(onsetScale, { toValue: 1, useNativeDriver: true }).start();
       },
     })
   ).current;
@@ -354,9 +370,10 @@ export default function SoundSlideScreen() {
     setShowSuccess(true);
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     speakText(exerciseData?.word ?? "", { usePhoneme: false, rate: 0.7 });
-    rimeScale.value = withTiming(1.12, { duration: 200 }, () => {
-      rimeScale.value = withTiming(1, { duration: 200 });
-    });
+    Animated.sequence([
+      Animated.timing(rimeScale, { toValue: 1.12, duration: 200, useNativeDriver: true }),
+      Animated.timing(rimeScale, { toValue: 1, duration: 200, useNativeDriver: true }),
+    ]).start();
     setTimeout(() => {
       setStage("merged");
       setShowFeedback(true);
@@ -371,45 +388,11 @@ export default function SoundSlideScreen() {
     }, 2600);
   };
 
-  const flashAnimatedStyle = useAnimatedStyle(() => {
-    const bg = interpolateColor(flash.value, [0, 1], ["rgba(255,211,61,0)", "rgba(255,211,61,0.3)"]);
-    return { backgroundColor: bg } as const;
-  }, [flash]);
-
-  const onsetAnimatedStyle = useAnimatedStyle(() => ({
-    position: "absolute" as const,
-    left: 0,
-    top: 0,
-    width: tileSize,
-    height: tileSize,
-    borderRadius: tileSize * 0.2,
-    transform: [
-      { translateX: onsetX.value - tileSize / 2 },
-      { translateY: onsetY.value - tileSize / 2 },
-      { scale: onsetScale.value },
-    ],
-  }), [tileSize, onsetX, onsetY, onsetScale]);
-
-  const rimeAnimatedStyle = useAnimatedStyle(() => ({
-    position: "absolute" as const,
-    left: 0,
-    top: 0,
-    width: tileSize,
-    height: tileSize,
-    borderRadius: tileSize * 0.2,
-    transform: [
-      { translateX: rimeX.value - tileSize / 2 },
-      { translateY: rimeY.value - tileSize / 2 },
-      { scale: rimeScale.value },
-    ],
-  }), [tileSize, rimeScale, rimeX, rimeY]);
-
   const cols = 12;
   const rows = 8;
 
   return (
-    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-
+    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>      
       <View style={styles.header} testID="header">
         <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 14 }]}>Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}</Text>
         <Text style={[styles.instructionText, { fontSize: isLandscape ? Math.max(14, width * 0.018) : Math.max(18, width * 0.04), marginTop: 4 }]}>Drag the sounds together to make a word!</Text>
@@ -455,7 +438,7 @@ export default function SoundSlideScreen() {
             layoutBodies({ x, y, width: w, height: h });
           }}
         >
-          <Animated.View style={[styles.flashOverlay, flashAnimatedStyle]} pointerEvents="none" testID="flash-overlay" />
+          <Animated.View style={[styles.flashOverlay, { backgroundColor: "rgba(255,211,61,0.3)", opacity: flashOpacity }]} pointerEvents="none" testID="flash-overlay" />
           {showDebugGrid && (
             <View pointerEvents="none" style={styles.debugOverlay} testID="debug-grid">
               <View style={styles.gridColumnsRow}>
@@ -476,13 +459,13 @@ export default function SoundSlideScreen() {
                   <Text style={styles.debugText}>marginPx: {Math.max(12, Math.round(tileSize * 0.25))}</Text>
                   <Text style={styles.debugText}>boundsX: {gameLayout.current ? Math.round(Math.max(12, tileSize * 0.25) + tileSize/2) : 0} - {gameLayout.current ? Math.round((gameLayout.current.width - Math.max(12, tileSize * 0.25) - tileSize/2)) : 0}</Text>
                   <Text style={styles.debugText}>boundsY: {gameLayout.current ? Math.round(Math.max(12, tileSize * 0.25) + tileSize/2) : 0} - {gameLayout.current ? Math.round((gameLayout.current.height - Math.max(12, tileSize * 0.25) - tileSize/2)) : 0}</Text>
-                  <Text style={styles.debugText}>onset(px): {Math.round(onsetX.value)}, {Math.round(onsetY.value)} | rime(px): {Math.round(rimeX.value)}, {Math.round(rimeY.value)}</Text>
+                  <Text style={styles.debugText}>onset(px): {Math.round(onsetXRef.current)}, {Math.round(onsetYRef.current)} | rime(px): {Math.round(rimeXRef.current)}, {Math.round(rimeYRef.current)}</Text>
                   <Text style={styles.debugText}>onset(norm): {onsetNormRef.current.x.toFixed(3)}, {onsetNormRef.current.y.toFixed(3)}</Text>
                   <Text style={styles.debugText}>rime(norm): {rimeNormRef.current.x.toFixed(3)}, {rimeNormRef.current.y.toFixed(3)}</Text>
                   <Text style={styles.debugText}>size(norm): {sizeNormRef.current.w.toFixed(3)} x {sizeNormRef.current.h.toFixed(3)}</Text>
                 </View>
               )}
-              {/* target center markers */}
+              {/* markers */}
               {gameLayout.current && (
                 <>
                   <View
@@ -508,7 +491,10 @@ export default function SoundSlideScreen() {
             <>
               <Animated.View
                 testID="onset-tile"
-                style={[styles.onsetTile, isPlayingOnset ? styles.tilePlaying : null, showSuccess ? styles.tileSuccess : null, onsetAnimatedStyle]}
+                style={[styles.onsetTile, isPlayingOnset ? styles.tilePlaying : null, showSuccess ? styles.tileSuccess : null, {
+                  position: 'absolute', left: 0, top: 0, width: tileSize, height: tileSize, borderRadius: tileSize * 0.2,
+                  transform: [{ translateX: onsetTranslateX }, { translateY: onsetTranslateY }, { scale: onsetScale }],
+                }]}
                 {...panResponder.panHandlers}
               >
                 <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.onset}</Text>
@@ -521,7 +507,10 @@ export default function SoundSlideScreen() {
 
               <Animated.View
                 testID="rime-tile"
-                style={[styles.rimeTile, isPlayingRime ? styles.tilePlaying : null, showSuccess ? styles.tileSuccess : null, rimeAnimatedStyle]}
+                style={[styles.rimeTile, isPlayingRime ? styles.tilePlaying : null, showSuccess ? styles.tileSuccess : null, {
+                  position: 'absolute', left: 0, top: 0, width: tileSize, height: tileSize, borderRadius: tileSize * 0.2,
+                  transform: [{ translateX: rimeTranslateX }, { translateY: rimeTranslateY }, { scale: rimeScale }],
+                }]}
               >
                 <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.rime}</Text>
                 {isPlayingRime && (
@@ -540,7 +529,7 @@ export default function SoundSlideScreen() {
                 style={[
                   styles.onsetTile,
                   { width: tileSize, height: tileSize, borderRadius: tileSize * 0.2, justifyContent: 'center', alignItems: 'center' },
-                  onsetAnimatedStyle,
+                  { transform: [{ translateX: onsetTranslateX }, { translateY: onsetTranslateY }, { scale: onsetScale }] },
                 ]}
                 {...panResponder.panHandlers}
               >
@@ -551,7 +540,7 @@ export default function SoundSlideScreen() {
                 style={[
                   styles.rimeTile,
                   { width: tileSize, height: tileSize, borderRadius: tileSize * 0.2, justifyContent: 'center', alignItems: 'center' },
-                  rimeAnimatedStyle,
+                  { transform: [{ translateX: rimeTranslateX }, { translateY: rimeTranslateY }, { scale: rimeScale }] },
                 ]}
               >
                 <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData?.rime}</Text>
@@ -571,7 +560,7 @@ export default function SoundSlideScreen() {
       </View>
 
       {showFeedback && (
-        <View style={[styles.feedbackContainer, { bottom: Math.max(24, height * (isLandscape ? 0.06 : 0.08)) }]}>
+        <View style={[styles.feedbackContainer, { bottom: Math.max(24, height * (isLandscape ? 0.06 : 0.08)) }]}>          
           <Text style={[styles.feedbackEmoji, { fontSize: Math.max(36, Math.min(84, Math.round((isLandscape ? height : width) * 0.08))) }]}>🎉</Text>
           <Text style={[styles.feedbackText, { fontSize: Math.max(18, Math.min(36, Math.round((isLandscape ? height : width) * 0.035))) }]}>Great job!</Text>
         </View>
