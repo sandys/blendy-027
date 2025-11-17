@@ -83,6 +83,19 @@ export interface WordBuilderData {
   image?: string;
 }
 
+export interface SoundSearchOption {
+  label: string;
+  isCorrect: boolean;
+}
+
+export interface SoundSearchData {
+  image: string;
+  word: string;
+  wordWithBlank: string;
+  prompt?: string;
+  choices: SoundSearchOption[];
+}
+
 export interface ChangeTheWordData {
   initialWord: string;
   changes: {
@@ -107,6 +120,7 @@ export type ExerciseData =
   | SoundSlideData
   | SoundDetectiveData
   | WordBuilderData
+  | SoundSearchData
   | ChangeTheWordData
   | HeartWordData;
 

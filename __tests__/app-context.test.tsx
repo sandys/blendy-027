@@ -17,6 +17,7 @@ describe("AppContext", () => {
   });
 
   afterEach(() => {
+    jest.clearAllTimers();
     jest.useRealTimers();
   });
 
@@ -27,6 +28,7 @@ describe("AppContext", () => {
 
     await act(async () => {
       jest.runAllTimers();
+      await Promise.resolve();
     });
 
     await waitFor(
@@ -49,6 +51,7 @@ describe("AppContext", () => {
 
     await act(async () => {
       jest.runAllTimers();
+      await Promise.resolve();
     });
 
     await waitFor(() => expect(harnessRef.current?.isLoading).toBe(false));
@@ -57,6 +60,10 @@ describe("AppContext", () => {
       harnessRef.current?.completeLesson(1, 3);
     });
     expect(AsyncStorage.setItem).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      jest.runAllTimers();
+      await Promise.resolve();
+    });
     let storedProgress = JSON.parse(
       (AsyncStorage.setItem as jest.Mock).mock.calls.at(-1)?.[1] ?? "{}"
     );
@@ -70,6 +77,10 @@ describe("AppContext", () => {
       harnessRef.current?.unlockPhoneme("/ē/");
     });
     expect(AsyncStorage.setItem).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      jest.runAllTimers();
+      await Promise.resolve();
+    });
     storedProgress = JSON.parse(
       (AsyncStorage.setItem as jest.Mock).mock.calls.at(-1)?.[1] ?? "{}"
     );

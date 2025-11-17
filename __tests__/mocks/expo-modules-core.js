@@ -1,8 +1,16 @@
-const EMC = jest.requireActual('expo-modules-core');
+const expoModulesCore = jest.requireActual("expo-modules-core");
 
-EMC.Platform = {
-  OS: 'android',
-  select: (specs) => specs.android,
+expoModulesCore.Platform = {
+  OS: "android",
+  select: (specs) => specs.android ?? specs.default ?? specs,
 };
 
-module.exports = EMC;
+if (!expoModulesCore.requireNativeModule) {
+  expoModulesCore.requireNativeModule = () => ({});
+}
+
+if (!expoModulesCore.requireOptionalNativeModule) {
+  expoModulesCore.requireOptionalNativeModule = () => null;
+}
+
+module.exports = expoModulesCore;

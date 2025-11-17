@@ -48,6 +48,17 @@ jest.mock("expo-speech", () => ({
   isSpeakingAsync: jest.fn().mockResolvedValue(false),
 }));
 
+jest.mock("expo-constants", () => ({
+  default: {
+    appOwnership: "standalone",
+    deviceName: "Test Device",
+    manifest: {},
+    nativeAppVersion: "1.0.0",
+    nativeBuildVersion: "1",
+    platform: { ios: { model: "iPad" } },
+  },
+}));
+
 jest.mock("expo-router", () => {
   const actual = jest.requireActual("expo-router");
   return {

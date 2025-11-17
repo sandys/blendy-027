@@ -21,6 +21,7 @@ const EXERCISE_TYPE_TO_ROUTE: Record<string, string> = {
   "Sound Slide": "/games/sound-slide",
   "Sound Detective": "/games/sound-detective",
   "Word Builder": "/games/word-builder",
+  "Sound Search": "/games/sound-search",
 };
 
 export default function LessonDetailScreen() {
@@ -128,6 +129,8 @@ export default function LessonDetailScreen() {
                     return `Find ${data.targetPosition || ""} sound in: ${data.word || ""}`;
                   case "Word Builder":
                     return `Build: ${data.word || ""}`;
+                  case "Sound Search":
+                    return `Complete: ${data.wordWithBlank || ""}`;
                   default:
                     return exercise.skill_focus;
                 }
