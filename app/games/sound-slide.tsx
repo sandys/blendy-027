@@ -35,14 +35,6 @@ const Engine = Matter.Engine;
 const World = Matter.World;
 const Body = Matter.Body;
 const Bodies = Matter.Bodies;
-const Events = Matter.Events;
-
-interface PhysicsBody {
-  id: string;
-  body: Matter.Body;
-  x: Animated.SharedValue<number>;
-  y: Animated.SharedValue<number>;
-}
 
 export default function SoundSlideScreen() {
   const insets = useSafeAreaInsets();
@@ -63,7 +55,7 @@ export default function SoundSlideScreen() {
   const [audioRestartKey, setAudioRestartKey] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(0);
 
-  // Physics animation values
+  // Animation values
   const onsetX = useSharedValue(0);
   const onsetY = useSharedValue(0);
   const onsetScale = useSharedValue(1);
@@ -71,19 +63,17 @@ export default function SoundSlideScreen() {
   const rimeY = useSharedValue(0);
   const rimeScale = useSharedValue(1);
   const flash = useSharedValue(0);
-  const rimeXShared = useSharedValue(0);
-  const rimeYShared = useSharedValue(0);
 
-  // Physics engine refs
+  // Physics refs
   const engineRef = useRef<Matter.Engine | null>(null);
-  const bodiesRef = useRef<Map<string, PhysicsBody>>(new Map());
+  const onsetBodyRef = useRef<Matter.Body | null>(null);
+  const rimeBodyRef = useRef<Matter.Body | null>(null);
   const draggedBodyRef = useRef<Matter.Body | null>(null);
   const mousePointRef = useRef<Point>({ x: 0, y: 0 });
-  const dragOffsetRef = useRef<Point>({ x: 0, y: 0 });
 
   const audioLoopRef = useRef(true);
   const isCompleteRef = useRef(false);
-  const boardCenterRef = useRef<Point>({ x: 0, y: 0 });
+  const boardConfigRef = useRef({ width: 0, height: 0 });
 
   // Board sizing
   const horizontalPadding = Math.max(16, width * 0.04);
@@ -102,22 +92,23 @@ export default function SoundSlideScreen() {
   }
 
   const tileSize = Math.min(Math.max(70, Math.min(boardWidth, boardHeight) * 0.22), 220);
-  const boardSize = useMemo(() => ({ width: boardWidth, height: boardHeight }), [boardWidth, boardHeight]);
 
-  // Initialize physics engine
-  const initializePhysics = useCallback(() => {
+  // Store board config
+  boardConfigRef.current = { width: boardWidth, height: boardHeight };
+
+  // Initialize physics
+  useEffect(() => {
+    const bw = boardWidth;
+    const bh = boardHeight;
+    const radius = tileSize / 2;
+
     // Create engine
     const newEngine = Engine.create();
-    newEngine.gravity.y = 0; // No gravity
+    newEngine.gravity.y = 0;
     engineRef.current = newEngine;
 
-    const { width: bw, height: bh } = boardSize;
-
-    // Create world boundaries (walls)
-    const margin = tileSize * 0.35;
+    // Create walls
     const wallThickness = 50;
-
-    // Bottom wall
     const bottomWall = Bodies.rectangle(
       bw / 2,
       bh + wallThickness / 2,
@@ -126,7 +117,6 @@ export default function SoundSlideScreen() {
       { isStatic: true, label: "wall" }
     );
 
-    // Top wall
     const topWall = Bodies.rectangle(
       bw / 2,
       -wallThickness / 2,
@@ -135,7 +125,6 @@ export default function SoundSlideScreen() {
       { isStatic: true, label: "wall" }
     );
 
-    // Left wall
     const leftWall = Bodies.rectangle(
       -wallThickness / 2,
       bh / 2,
@@ -144,7 +133,6 @@ export default function SoundSlideScreen() {
       { isStatic: true, label: "wall" }
     );
 
-    // Right wall
     const rightWall = Bodies.rectangle(
       bw + wallThickness / 2,
       bh / 2,
@@ -155,65 +143,50 @@ export default function SoundSlideScreen() {
 
     World.add(newEngine.world, [bottomWall, topWall, leftWall, rightWall]);
 
-    // Create onset tile body (draggable)
-    const onsetRadius = tileSize / 2;
-    const onsetStartX = (bw * 0.32);
-    const onsetStartY = (bh * 0.5);
-
-    const onsetBody = Bodies.circle(onsetStartX, onsetStartY, onsetRadius, {
+    // Create onset body
+    const onsetStartX = bw * 0.32;
+    const onsetStartY = bh * 0.5;
+    const onsetBody = Bodies.circle(onsetStartX, onsetStartY, radius, {
       friction: 0.4,
       restitution: 0.2,
       frictionAir: 0.02,
       label: "onset",
     });
 
-    // Create rime tile body (static)
-    const rimeRadius = tileSize / 2;
-    const rimePosX = bw * 0.68;
-    const rimePosY = bh * 0.5;
-
-    const rimeBody = Bodies.circle(rimePosX, rimePosY, rimeRadius, {
+    // Create rime body
+    const rimeStartX = bw * 0.68;
+    const rimeStartY = bh * 0.5;
+    const rimeBody = Bodies.circle(rimeStartX, rimeStartY, radius, {
       isStatic: true,
       label: "rime",
     });
 
+    onsetBodyRef.current = onsetBody;
+    rimeBodyRef.current = rimeBody;
+
     World.add(newEngine.world, [onsetBody, rimeBody]);
 
-    // Update shared values for rime position
-    rimeXShared.value = rimePosX;
-    rimeYShared.value = rimePosY;
+    // Set initial animation values
+    onsetX.value = onsetStartX;
+    onsetY.value = onsetStartY;
+    rimeX.value = rimeStartX;
+    rimeY.value = rimeStartY;
 
-    // Store physics bodies with animation values
-    bodiesRef.current.clear();
-    bodiesRef.current.set("onset", {
-      id: "onset",
-      body: onsetBody,
-      x: onsetX,
-      y: onsetY,
-    });
-
-    bodiesRef.current.set("rime", {
-      id: "rime",
-      body: rimeBody,
-      x: rimeXShared,
-      y: rimeYShared,
-    });
-
-    // Set up physics update loop
+    // Physics loop
     let lastTime = Date.now();
     const physicsLoop = setInterval(() => {
       if (!engineRef.current) return;
 
       const now = Date.now();
-      const deltaTime = Math.min((now - lastTime) / 1000, 0.016); // Cap at 16ms
+      const deltaTime = Math.min((now - lastTime) / 1000, 0.016);
       lastTime = now;
 
       // Apply drag force if dragging
-      if (draggedBodyRef.current && draggedBodyRef.current === onsetBody) {
-        const dx = mousePointRef.current.x - draggedBodyRef.current.position.x;
-        const dy = mousePointRef.current.y - draggedBodyRef.current.position.y;
+      if (draggedBodyRef.current && onsetBody) {
+        const dx = mousePointRef.current.x - onsetBody.position.x;
+        const dy = mousePointRef.current.y - onsetBody.position.y;
         const forceMagnitude = 0.001;
-        Body.applyForce(draggedBodyRef.current, draggedBodyRef.current.position, {
+        Body.applyForce(onsetBody, onsetBody.position, {
           x: dx * forceMagnitude,
           y: dy * forceMagnitude,
         });
@@ -222,51 +195,37 @@ export default function SoundSlideScreen() {
       // Update engine
       Engine.update(newEngine, deltaTime * 1000);
 
-      // Sync physics bodies to animation values
-      bodiesRef.current.forEach((physicsBody) => {
-        physicsBody.x.value = physicsBody.body.position.x;
-        physicsBody.y.value = physicsBody.body.position.y;
-      });
+      // Sync to animations
+      onsetX.value = onsetBody.position.x;
+      onsetY.value = onsetBody.position.y;
+      rimeX.value = rimeBody.position.x;
+      rimeY.value = rimeBody.position.y;
 
-      // Check for collision between onset and rime
-      if (stage === "drag") {
-        const onsetPhysics = bodiesRef.current.get("onset");
-        const rimePhysics = bodiesRef.current.get("rime");
+      // Collision check
+      if (stage === "drag" && !isCompleteRef.current && onsetBody && rimeBody) {
+        const dx = onsetBody.position.x - rimeBody.position.x;
+        const dy = onsetBody.position.y - rimeBody.position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const collisionDist = tileSize * 0.6;
 
-        if (onsetPhysics && rimePhysics) {
-          const dx = onsetPhysics.body.position.x - rimePhysics.body.position.x;
-          const dy = onsetPhysics.body.position.y - rimePhysics.body.position.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          const collisionDistance = tileSize * 0.6; // Collision threshold
-
-          if (distance < collisionDistance && !isCompleteRef.current) {
-            handleSuccess();
-          }
-
-          // Visual feedback when hovering
-          const hoverDistance = tileSize * 0.8;
-          rimeScale.value = withTiming(distance < hoverDistance ? 1.08 : 1, { duration: 120 });
+        if (distance < collisionDist) {
+          handleSuccess();
         }
+
+        // Hover feedback
+        const hoverDist = tileSize * 0.8;
+        rimeScale.value = withTiming(distance < hoverDist ? 1.08 : 1, { duration: 120 });
       }
-    }, 1000 / 60); // 60 FPS
+    }, 1000 / 60);
 
-    return () => clearInterval(physicsLoop);
-  }, [boardSize, tileSize, stage, onsetX, onsetY, rimeXShared, rimeYShared]);
-
-  // Handle mouse/touch movements
-  const handleBoardMove = useCallback(
-    (x: number, y: number) => {
-      if (!draggedBodyRef.current) return;
-
-      const { width: bw, height: bh } = boardSize;
-      const margin = tileSize * 0.35;
-      const clampedX = Math.max(margin + tileSize / 2, Math.min(bw - margin - tileSize / 2, x));
-      const clampedY = Math.max(margin + tileSize / 2, Math.min(bh - margin - tileSize / 2, y));
-
-      mousePointRef.current = { x: clampedX, y: clampedY };
-    },
-    [boardSize, tileSize]
-  );
+    return () => {
+      clearInterval(physicsLoop);
+      if (engineRef.current) {
+        World.clear(engineRef.current.world, false);
+        Engine.clear(engineRef.current);
+      }
+    };
+  }, [boardWidth, boardHeight, tileSize, stage]);
 
   const handleSuccess = useCallback(() => {
     isCompleteRef.current = true;
@@ -297,11 +256,19 @@ export default function SoundSlideScreen() {
     }, 2400);
   }, [exerciseData, exerciseIndex, lesson, lessonNumber, rimeScale]);
 
-  // Initialize and manage physics
-  useEffect(() => {
-    const cleanup = initializePhysics();
-    return cleanup;
-  }, [initializePhysics]);
+  const resetOnset = useCallback(() => {
+    if (onsetBodyRef.current) {
+      const bw = boardConfigRef.current.width;
+      const bh = boardConfigRef.current.height;
+      const targetX = bw * 0.32;
+      const targetY = bh * 0.5;
+
+      Body.setPosition(onsetBodyRef.current, { x: targetX, y: targetY });
+      Body.setVelocity(onsetBodyRef.current, { x: 0, y: 0 });
+      Body.setAngularVelocity(onsetBodyRef.current, 0);
+    }
+    onsetScale.value = withTiming(1, { duration: 140 });
+  }, [onsetScale]);
 
   // Audio loop
   useEffect(() => {
@@ -341,20 +308,6 @@ export default function SoundSlideScreen() {
     };
   }, [exerciseData, exerciseIndex, lessonNumber, flash, onsetScale, rimeScale, audioRestartKey]);
 
-  const resetOnset = useCallback(() => {
-    const onsetPhysics = bodiesRef.current.get("onset");
-    if (onsetPhysics) {
-      const { width: bw, height: bh } = boardSize;
-      const targetX = bw * 0.32;
-      const targetY = bh * 0.5;
-
-      Body.setPosition(onsetPhysics.body, { x: targetX, y: targetY });
-      Body.setVelocity(onsetPhysics.body, { x: 0, y: 0 });
-      Body.setAngularVelocity(onsetPhysics.body, 0);
-    }
-    onsetScale.value = withTiming(1, { duration: 140 });
-  }, [boardSize, onsetScale]);
-
   if (!exerciseData) {
     return (
       <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
@@ -382,8 +335,8 @@ export default function SoundSlideScreen() {
   const rimeStyle = useAnimatedStyle(
     () => ({
       transform: [
-        { translateX: rimeXShared.value - tileSize / 2 } as any,
-        { translateY: rimeYShared.value - tileSize / 2 } as any,
+        { translateX: rimeX.value - tileSize / 2 } as any,
+        { translateY: rimeY.value - tileSize / 2 } as any,
         { scale: rimeScale.value } as any,
       ],
     }),
@@ -393,34 +346,30 @@ export default function SoundSlideScreen() {
   const dropHaloStyle = useAnimatedStyle(
     () => ({
       transform: [
-        { translateX: rimeXShared.value - tileSize } as any,
-        { translateY: rimeYShared.value - tileSize } as any,
+        { translateX: rimeX.value - tileSize } as any,
+        { translateY: rimeY.value - tileSize } as any,
       ],
     }),
     [tileSize]
   );
 
   const handleBoardTouchStart = (e: any) => {
-    if (stage !== "drag") return;
+    if (stage !== "drag" || !onsetBodyRef.current) return;
 
     const touch = e.nativeEvent;
     const x = touch.locationX;
     const y = touch.locationY;
 
-    const onsetPhysics = bodiesRef.current.get("onset");
-    if (onsetPhysics) {
-      const dx = x - onsetPhysics.body.position.x;
-      const dy = y - onsetPhysics.body.position.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+    const dx = x - onsetBodyRef.current.position.x;
+    const dy = y - onsetBodyRef.current.position.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
 
-      if (distance < tileSize / 2 + 20) {
-        draggedBodyRef.current = onsetPhysics.body;
-        dragOffsetRef.current = { x: dx, y: dy };
-        mousePointRef.current = { x, y };
-        onsetScale.value = withSpring(1.08);
-        if (Platform.OS !== "web") {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        }
+    if (distance < tileSize / 2 + 20) {
+      draggedBodyRef.current = onsetBodyRef.current;
+      mousePointRef.current = { x, y };
+      onsetScale.value = withSpring(1.08);
+      if (Platform.OS !== "web") {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
     }
   };
@@ -429,7 +378,14 @@ export default function SoundSlideScreen() {
     if (stage !== "drag" || !draggedBodyRef.current) return;
 
     const touch = e.nativeEvent;
-    handleBoardMove(touch.locationX, touch.locationY);
+    const bw = boardConfigRef.current.width;
+    const bh = boardConfigRef.current.height;
+    const margin = tileSize * 0.35;
+
+    const clampedX = Math.max(margin + tileSize / 2, Math.min(bw - margin - tileSize / 2, touch.locationX));
+    const clampedY = Math.max(margin + tileSize / 2, Math.min(bh - margin - tileSize / 2, touch.locationY));
+
+    mousePointRef.current = { x: clampedX, y: clampedY };
   };
 
   const handleBoardTouchEnd = () => {
