@@ -4013,11 +4013,11 @@ export const SAMPLE_LESSONS: Lesson[] = [
         assets: { audio: ["sw.mp3", "i.mp3", "m.mp3", "swim.mp3"] },
         srs_data: { due_date: null, stability: 0, difficulty: 0, review_history: [] },
       },
-      {
-        exercise_id: "L25-WordBuilder-005",
-        lesson_number: 25,
-        exercise_type: "Word Builder",
-        skill_focus: "Consonant Blend",
+  {
+    exercise_id: "L25-WordBuilder-005",
+    lesson_number: 25,
+    exercise_type: "Word Builder",
+    skill_focus: "Consonant Blend",
         data: { word: "spin", letters: ["sp", "i", "n"], image: "🌀" },
         response_type: "drag_and_drop",
         assets: { audio: ["sp.mp3", "i.mp3", "n.mp3", "spin.mp3"] },
@@ -4025,5 +4025,39 @@ export const SAMPLE_LESSONS: Lesson[] = [
       },
     ],
     story: { title: "Skip and swim", text: "Skip into the swim. Stop and snap. I could spin." },
+  },
+  {
+    lesson_number: 26,
+    phase: 3,
+    title: "Digraph sh",
+    description: "Identify the /sh/ sound at the start of words.",
+    new_graphemes: ["sh"],
+    exercises: [
+      {
+        exercise_id: "L26-SoundSearch-001",
+        lesson_number: 26,
+        exercise_type: "Sound Search",
+        skill_focus: "Blend the /sh/ digraph with word endings.",
+        data: {
+          image: "🚢",
+          word: "ship",
+          wordWithBlank: "__ip",
+          prompt: "What sound starts ship?",
+          choicePrompt: "Tap the correct digraph",
+          choices: [
+            { label: "sh", isCorrect: true },
+            { label: "ch", isCorrect: false },
+            { label: "th", isCorrect: false },
+          ],
+        },
+        response_type: "tap_choice",
+        assets: { audio: [], images: [] },
+        srs_data: { due_date: null, stability: 0, difficulty: 0, review_history: [] },
+      },
+    ],
+    story: {
+      title: "Ship on a Shelf",
+      text: "Tim's mom set a gift box on a shelf in a shed. It had a fast ship in it. His mom had his dad get it at a shop.",
+    },
   },
 ];

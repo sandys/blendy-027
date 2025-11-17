@@ -93,6 +93,7 @@ export interface SoundSearchData {
   word: string;
   wordWithBlank: string;
   prompt?: string;
+  choicePrompt?: string;
   choices: SoundSearchOption[];
 }
 
