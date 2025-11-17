@@ -71,6 +71,8 @@ export default function SoundSlideScreen() {
   const rimeY = useSharedValue(0);
   const rimeScale = useSharedValue(1);
   const flash = useSharedValue(0);
+  const rimeXShared = useSharedValue(0);
+  const rimeYShared = useSharedValue(0);
 
   // Physics engine refs
   const engineRef = useRef<Matter.Engine | null>(null);
@@ -167,15 +169,19 @@ export default function SoundSlideScreen() {
 
     // Create rime tile body (static)
     const rimeRadius = tileSize / 2;
-    const rimeX = bw * 0.68;
-    const rimeY = bh * 0.5;
+    const rimePosX = bw * 0.68;
+    const rimePosY = bh * 0.5;
 
-    const rimeBody = Bodies.circle(rimeX, rimeY, rimeRadius, {
+    const rimeBody = Bodies.circle(rimePosX, rimePosY, rimeRadius, {
       isStatic: true,
       label: "rime",
     });
 
     World.add(newEngine.world, [onsetBody, rimeBody]);
+
+    // Update shared values for rime position
+    rimeXShared.value = rimePosX;
+    rimeYShared.value = rimePosY;
 
     // Store physics bodies with animation values
     bodiesRef.current.clear();
@@ -189,8 +195,8 @@ export default function SoundSlideScreen() {
     bodiesRef.current.set("rime", {
       id: "rime",
       body: rimeBody,
-      x: useSharedValue(rimeX),
-      y: useSharedValue(rimeY),
+      x: rimeXShared,
+      y: rimeYShared,
     });
 
     // Set up physics update loop
@@ -245,7 +251,7 @@ export default function SoundSlideScreen() {
     }, 1000 / 60); // 60 FPS
 
     return () => clearInterval(physicsLoop);
-  }, [boardSize, tileSize, stage, onsetX, onsetY, rimeX, rimeY]);
+  }, [boardSize, tileSize, stage, onsetX, onsetY, rimeXShared, rimeYShared]);
 
   // Handle mouse/touch movements
   const handleBoardMove = useCallback(
@@ -376,8 +382,8 @@ export default function SoundSlideScreen() {
   const rimeStyle = useAnimatedStyle(
     () => ({
       transform: [
-        { translateX: rimeX.value - tileSize / 2 } as any,
-        { translateY: rimeY.value - tileSize / 2 } as any,
+        { translateX: rimeXShared.value - tileSize / 2 } as any,
+        { translateY: rimeYShared.value - tileSize / 2 } as any,
         { scale: rimeScale.value } as any,
       ],
     }),
@@ -387,8 +393,8 @@ export default function SoundSlideScreen() {
   const dropHaloStyle = useAnimatedStyle(
     () => ({
       transform: [
-        { translateX: rimeX.value - tileSize } as any,
-        { translateY: rimeY.value - tileSize } as any,
+        { translateX: rimeXShared.value - tileSize } as any,
+        { translateY: rimeYShared.value - tileSize } as any,
       ],
     }),
     [tileSize]
