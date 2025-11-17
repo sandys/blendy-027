@@ -1,12 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   useWindowDimensions,
   Platform,
-  PanResponder,
   Pressable,
+  PanResponder,
 } from "react-native";
 import Animated, {
   interpolateColor,
@@ -22,23 +22,28 @@ import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
 import { Volume2 } from "lucide-react-native";
 
-type LayoutSize = { width: number; height: number };
+type ExerciseData = {
+  onset: string;
+  rime: string;
+  word: string;
+  image: string;
+};
+
+type Point = { x: number; y: number };
 
 export default function SoundSlideScreen() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const params = useLocalSearchParams();
-  const lessonNumber = parseInt(params.lesson as string);
-  const exerciseIndex = parseInt(params.exercise as string);
+  const lessonNumber = Number(params.lesson ?? 1);
+  const exerciseIndex = Number(params.exercise ?? 0);
 
   const lesson = SAMPLE_LESSONS.find((l) => l.lesson_number === lessonNumber);
   const exercise = lesson?.exercises[exerciseIndex];
-  const exerciseData = exercise?.data as
-    | { onset: string; rime: string; word: string; image: string }
-    | undefined;
+  const exerciseData = (exercise?.data as ExerciseData) ?? null;
 
-  const [stage, setStage] = useState<"initial" | "merged">("initial");
+  const [stage, setStage] = useState<"drag" | "merged">("drag");
   const [showFeedback, setShowFeedback] = useState(false);
   const [isPlayingOnset, setIsPlayingOnset] = useState(false);
   const [isPlayingRime, setIsPlayingRime] = useState(false);
@@ -53,214 +58,195 @@ export default function SoundSlideScreen() {
   const rimeScale = useSharedValue(1);
   const flash = useSharedValue(0);
 
-  const gameLayout = useRef<LayoutSize | null>(null);
-  const dragStartCenter = useRef({ x: 0, y: 0 });
-  const homeOnsetNorm = useRef({ x: 0.35, y: 0.5 });
-  const homeRimeNorm = useRef({ x: 0.65, y: 0.5 });
-  const onsetNormRef = useRef({ x: 0.35, y: 0.5 });
-  const rimeNormRef = useRef({ x: 0.65, y: 0.5 });
+  const homeOnset = useRef<Point>({ x: 0, y: 0 });
+  const dragStart = useRef<Point>({ x: 0, y: 0 });
+  const dropCenter = useRef<Point>({ x: 0, y: 0 });
   const audioLoopRef = useRef(true);
-  const isCorrectAnswerGiven = useRef(false);
+  const isCompleteRef = useRef(false);
 
-  const tileSize = useMemo(() => {
-    const minDim = Math.min(width, height);
-    const scale = isLandscape ? 0.18 : 0.28;
-    return Math.max(72, Math.min(180, Math.round(minDim * scale)));
-  }, [isLandscape, width, height]);
-
-  const containerPaddingHorizontal = Math.max(16, width * 0.04);
-  const verticalSpacing = Math.max(24, height * 0.04);
-  const safeHeight = Math.max(
-    220,
-    height - insets.top - insets.bottom - headerHeight - verticalSpacing - 16
-  );
-  const safeWidth = Math.max(260, Math.min(width - containerPaddingHorizontal * 2, 1000));
+  const horizontalPadding = Math.max(16, width * 0.04);
+  const headerSpacing = Math.max(18, height * 0.02);
+  const availableHeight =
+    height - insets.top - insets.bottom - headerHeight - headerSpacing - 32;
+  const maxBoardWidth = Math.min(width - horizontalPadding * 2, 1024);
+  const maxBoardHeight = Math.max(260, availableHeight);
   const boardAspect = isLandscape ? 16 / 9 : 4 / 5;
-  const widthFromHeight = safeHeight * boardAspect;
-  const boardWidth = Math.min(safeWidth, widthFromHeight);
-  const boardHeight = boardWidth / boardAspect;
-  const boardPadding = Math.max(12, boardWidth * 0.045);
 
-  const positionTiles = useCallback(
-    (layout?: LayoutSize) => {
-      const gl = layout ?? gameLayout.current;
-      if (!gl) return;
-      const marginPx = Math.max(12, Math.round(tileSize * 0.25));
-      const leftIdeal = 0.32;
-      const rightIdeal = 0.68;
-      const half = tileSize / 2;
-      const minCx = (marginPx + half) / gl.width;
-      const maxCx = (gl.width - marginPx - half) / gl.width;
-      const cy = 0.5;
+  let boardWidth = maxBoardWidth;
+  let boardHeight = boardWidth / boardAspect;
+  if (boardHeight > maxBoardHeight) {
+    boardHeight = maxBoardHeight;
+    boardWidth = boardHeight * boardAspect;
+  }
+  const tileSize = Math.min(Math.max(70, Math.min(boardWidth, boardHeight) * 0.22), 220);
 
-      const adjustedLeft = Math.max(minCx, Math.min(maxCx, leftIdeal));
-      const adjustedRight = Math.max(minCx, Math.min(maxCx, rightIdeal));
+  const boardSize = useMemo(() => ({ width: boardWidth, height: boardHeight }), [boardWidth, boardHeight]);
 
-      homeOnsetNorm.current = { x: adjustedLeft, y: cy };
-      homeRimeNorm.current = { x: adjustedRight, y: cy };
-      onsetNormRef.current = { ...homeOnsetNorm.current };
-      rimeNormRef.current = { ...homeRimeNorm.current };
+  const placeTiles = useCallback(() => {
+    const { width: bw, height: bh } = boardSize;
+    const margin = Math.max(tileSize * 0.3, 16);
+    const half = tileSize / 2;
+    const minCx = (margin + half) / bw;
+    const maxCx = (bw - margin - half) / bw;
+    const leftCenter = Math.max(minCx, Math.min(0.32, maxCx)) * bw;
+    const rightCenter = Math.max(minCx, Math.min(0.68, maxCx)) * bw;
+    const centerY = bh * 0.5;
 
-      onsetX.value = adjustedLeft * gl.width;
-      onsetY.value = cy * gl.height;
-      rimeX.value = adjustedRight * gl.width;
-      rimeY.value = cy * gl.height;
-    },
-    [tileSize, onsetX, onsetY, rimeX, rimeY]
-  );
+    homeOnset.current = { x: leftCenter, y: centerY };
+    dropCenter.current = { x: rightCenter, y: centerY };
+    onsetX.value = leftCenter;
+    onsetY.value = centerY;
+    rimeX.value = rightCenter;
+    rimeY.value = centerY;
+  }, [boardSize, onsetX, onsetY, rimeX, rimeY, tileSize]);
+
+  useEffect(() => {
+    placeTiles();
+  }, [placeTiles]);
 
   useEffect(() => {
     audioLoopRef.current = true;
-    isCorrectAnswerGiven.current = false;
-    setStage("initial");
+    isCompleteRef.current = false;
+    setStage("drag");
     setShowFeedback(false);
     onsetScale.value = 1;
     rimeScale.value = 1;
 
-    const playLoop = async () => {
-      flash.value = withTiming(1, { duration: 200 }, () => {
-        flash.value = withTiming(0, { duration: 200 });
+    const loopAudio = async () => {
+      flash.value = withTiming(1, { duration: 220 }, () => {
+        flash.value = withTiming(0, { duration: 220 });
       });
       if (Platform.OS !== "web") {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       }
-      await new Promise((r) => setTimeout(r, 300));
-      while (audioLoopRef.current && !isCorrectAnswerGiven.current) {
+      await new Promise((resolve) => setTimeout(resolve, 280));
+
+      while (audioLoopRef.current && !isCompleteRef.current) {
         setIsPlayingOnset(true);
         await speakText(exerciseData?.onset ?? "", { usePhoneme: true });
         setIsPlayingOnset(false);
-        await new Promise((r) => setTimeout(r, 700));
-        if (!audioLoopRef.current || isCorrectAnswerGiven.current) break;
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        if (!audioLoopRef.current || isCompleteRef.current) break;
         setIsPlayingRime(true);
         await speakText(exerciseData?.rime ?? "", { usePhoneme: false });
         setIsPlayingRime(false);
-        await new Promise((r) => setTimeout(r, 1100));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     };
-    if (exerciseData) playLoop();
+    if (exerciseData) {
+      loopAudio();
+    }
     return () => {
       audioLoopRef.current = false;
     };
   }, [exerciseData, exerciseIndex, lessonNumber, flash, onsetScale, rimeScale, audioRestartKey]);
 
-  const resetTilePosition = useCallback(() => {
-    const gl = gameLayout.current;
-    if (!gl) return;
-    const targetX = homeOnsetNorm.current.x * gl.width;
-    const targetY = homeOnsetNorm.current.y * gl.height;
-    onsetNormRef.current = { ...homeOnsetNorm.current };
-    onsetX.value = withSpring(targetX);
-    onsetY.value = withSpring(targetY);
-    rimeScale.value = withTiming(1, { duration: 150 });
+  const resetOnset = useCallback(() => {
+    const { x, y } = homeOnset.current;
+    onsetX.value = withSpring(x, { damping: 12, stiffness: 150 });
+    onsetY.value = withSpring(y, { damping: 12, stiffness: 150 });
+    rimeScale.value = withTiming(1, { duration: 140 });
   }, [onsetX, onsetY, rimeScale]);
 
   const handleSuccess = useCallback(() => {
-    isCorrectAnswerGiven.current = true;
+    isCompleteRef.current = true;
     audioLoopRef.current = false;
     setIsPlayingOnset(false);
     setIsPlayingRime(false);
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    speakText(exerciseData?.word ?? "", { usePhoneme: false, rate: 0.72 });
+    speakText(exerciseData?.word ?? "", { rate: 0.72 });
     rimeScale.value = withTiming(1.12, { duration: 220 }, () => {
       rimeScale.value = withTiming(1, { duration: 220 });
     });
     setTimeout(() => {
       setStage("merged");
       setShowFeedback(true);
-    }, 600);
+    }, 500);
     setTimeout(() => {
-      const nextExerciseIndex = exerciseIndex + 1;
-      if (lesson && nextExerciseIndex < (lesson.exercises?.length ?? 0)) {
+      const nextExercise = exerciseIndex + 1;
+      if (lesson && nextExercise < (lesson.exercises?.length ?? 0)) {
         router.replace({
           pathname: "/games/sound-slide",
-          params: { lesson: lessonNumber, exercise: nextExerciseIndex },
+          params: { lesson: lessonNumber, exercise: nextExercise },
         });
       } else {
         router.back();
       }
     }, 2400);
-  }, [exerciseData, exerciseIndex, rimeScale, lesson, lessonNumber]);
+  }, [exerciseData, exerciseIndex, lesson, lessonNumber, rimeScale]);
 
-  const hitThreshold = tileSize * 0.45;
-  const checkHover = useCallback(
+  const dropThreshold = tileSize * 0.45;
+  const isHovering = useCallback(
     (nx: number, ny: number) => {
-      const dx = nx - rimeX.value;
-      const dy = ny - rimeY.value;
-      return Math.sqrt(dx * dx + dy * dy) <= hitThreshold;
+      const dx = nx - dropCenter.current.x;
+      const dy = ny - dropCenter.current.y;
+      return Math.sqrt(dx * dx + dy * dy) <= dropThreshold;
     },
-    [hitThreshold, rimeX, rimeY]
+    [dropThreshold]
   );
 
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => stage === "initial" && !!gameLayout.current,
-        onMoveShouldSetPanResponder: () => stage === "initial" && !!gameLayout.current,
+        onStartShouldSetPanResponder: () => stage === "drag",
+        onMoveShouldSetPanResponder: () => stage === "drag",
         onPanResponderGrant: () => {
           if (Platform.OS !== "web") {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           }
           onsetScale.value = withSpring(1.08);
-          dragStartCenter.current = { x: onsetX.value, y: onsetY.value };
+          dragStart.current = { x: onsetX.value, y: onsetY.value };
         },
-        onPanResponderTerminationRequest: () => false,
         onPanResponderMove: (_evt, gesture) => {
-          const gl = gameLayout.current;
-          if (!gl) return;
-          const marginPx = Math.max(12, tileSize * 0.25);
+          if (stage !== "drag") return;
+          const { width: bw, height: bh } = boardSize;
+          const margin = tileSize * 0.35;
           const half = tileSize / 2;
-          const minX = marginPx + half;
-          const maxX = gl.width - marginPx - half;
-          const minY = marginPx + half;
-          const maxY = gl.height - marginPx - half;
-          let nx = dragStartCenter.current.x + gesture.dx;
-          let ny = dragStartCenter.current.y + gesture.dy;
+          const minX = margin + half;
+          const maxX = bw - margin - half;
+          const minY = margin + half;
+          const maxY = bh - margin - half;
+          let nx = dragStart.current.x + gesture.dx;
+          let ny = dragStart.current.y + gesture.dy;
           nx = Math.max(minX, Math.min(maxX, nx));
           ny = Math.max(minY, Math.min(maxY, ny));
           onsetX.value = nx;
           onsetY.value = ny;
-          onsetNormRef.current = { x: nx / gl.width, y: ny / gl.height };
-          const hovering = checkHover(nx, ny);
-          rimeScale.value = withTiming(hovering ? 1.08 : 1, { duration: 140 });
+          rimeScale.value = withTiming(isHovering(nx, ny) ? 1.08 : 1, { duration: 120 });
         },
         onPanResponderRelease: () => {
           onsetScale.value = withSpring(1);
-          const gl = gameLayout.current;
-          if (!gl) {
-            resetTilePosition();
-            return;
-          }
-          const hit = checkHover(onsetX.value, onsetY.value);
+          const hit = isHovering(onsetX.value, onsetY.value);
           if (hit) {
             handleSuccess();
           } else {
-            resetTilePosition();
+            resetOnset();
           }
         },
         onPanResponderTerminate: () => {
           onsetScale.value = withSpring(1);
-          resetTilePosition();
+          resetOnset();
         },
       }),
-    [stage, tileSize, handleSuccess, resetTilePosition, checkHover, onsetScale, onsetX, onsetY, rimeScale]
+    [boardSize, handleSuccess, isHovering, resetOnset, stage, tileSize, onsetScale, onsetX, onsetY, rimeScale]
   );
 
-  useEffect(() => {
-    if (gameLayout.current) {
-      positionTiles();
-    }
-  }, [positionTiles, tileSize, stage]);
+  if (!exerciseData) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <Text style={styles.errorText}>Exercise not found</Text>
+      </View>
+    );
+  }
 
   const flashStyle = useAnimatedStyle(() => {
-    const bg = interpolateColor(flash.value, [0, 1], ["rgba(0,0,0,0)", "rgba(255,211,61,0.2)"]);
-    return { backgroundColor: bg };
+    const color = interpolateColor(flash.value, [0, 1], ["rgba(0,0,0,0)", "rgba(255,211,61,0.25)"]);
+    return { backgroundColor: color };
   }, [flash]);
 
-  const haloSize = tileSize * 1.4;
-
-  const onsetAnimatedStyle = useAnimatedStyle(
+  const onsetStyle = useAnimatedStyle(
     () => ({
       transform: [
         { translateX: onsetX.value - tileSize / 2 },
@@ -271,7 +257,7 @@ export default function SoundSlideScreen() {
     [tileSize]
   );
 
-  const rimeAnimatedStyle = useAnimatedStyle(
+  const rimeStyle = useAnimatedStyle(
     () => ({
       transform: [
         { translateX: rimeX.value - tileSize / 2 },
@@ -282,14 +268,14 @@ export default function SoundSlideScreen() {
     [tileSize]
   );
 
-  const haloAnimatedStyle = useAnimatedStyle(
+  const haloStyle = useAnimatedStyle(
     () => ({
       transform: [
-        { translateX: rimeX.value - haloSize / 2 },
-        { translateY: rimeY.value - haloSize / 2 },
+        { translateX: dropCenter.current.x - tileSize },
+        { translateY: dropCenter.current.y - tileSize },
       ],
     }),
-    [haloSize]
+    [tileSize]
   );
 
   return (
@@ -297,14 +283,14 @@ export default function SoundSlideScreen() {
       style={[
         styles.container,
         {
-          paddingTop: insets.top + 12,
-          paddingBottom: Math.max(insets.bottom + 12, 20),
-          paddingHorizontal: containerPaddingHorizontal,
+          paddingTop: insets.top + 16,
+          paddingBottom: insets.bottom + 16,
+          paddingHorizontal: horizontalPadding,
         },
       ]}
     >
       <View
-        style={[styles.header, { paddingHorizontal: containerPaddingHorizontal }]}
+        style={[styles.header, { marginBottom: headerSpacing }]}
         onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}
       >
         <View style={styles.headerRow}>
@@ -312,131 +298,92 @@ export default function SoundSlideScreen() {
             Exercise {exerciseIndex + 1} of {lesson?.exercises.length ?? 0}
           </Text>
           <Pressable
-            hitSlop={12}
             style={styles.replayButton}
-            accessibilityRole="button"
             onPress={() => {
               audioLoopRef.current = false;
-              isCorrectAnswerGiven.current = false;
-              setStage("initial");
+              isCompleteRef.current = false;
+              setStage("drag");
               setShowFeedback(false);
-              positionTiles();
+              placeTiles();
               setAudioRestartKey((key) => key + 1);
             }}
+            accessibilityRole="button"
           >
-            <Volume2 size={20} color="#1A1A1A" />
+            <Volume2 size={18} color="#1A1A1A" />
             <Text style={styles.replayText}>Replay</Text>
           </Pressable>
         </View>
         <Text
           style={[
             styles.instructionText,
-            {
-              fontSize: isLandscape ? Math.max(16, width * 0.018) : Math.max(18, width * 0.042),
-            },
+            { fontSize: isLandscape ? Math.max(16, width * 0.018) : Math.max(18, width * 0.042) },
           ]}
         >
-          Drag the sounds together to make a word!
+          Drag the sounds together to build the word.
         </Text>
       </View>
 
-      <View style={[styles.gameArea, { paddingVertical: verticalSpacing * 0.35 }]}>
-        <View style={[styles.boardOuter, { paddingVertical: verticalSpacing * 0.3 }]}>
-          <View
-            style={[
-              styles.board,
-              {
-                width: boardWidth,
-                height: boardHeight,
-                padding: boardPadding,
-                borderRadius: Math.max(24, boardWidth * 0.04),
-              },
-            ]}
-            onLayout={(e) => {
-              const { width: w, height: h } = e.nativeEvent.layout;
-              if (w <= 0 || h <= 0) return;
-              gameLayout.current = { width: w, height: h };
-              positionTiles({ width: w, height: h });
-            }}
-          >
-            <Animated.View style={[styles.flashOverlay, flashStyle]} pointerEvents="none" />
-            {stage === "initial" && (
-              <>
-                <Animated.View
-                  pointerEvents="none"
-                  style={[
-                    styles.dropHalo,
-                    {
-                      width: haloSize,
-                      height: haloSize,
-                      borderRadius: haloSize / 2,
-                    },
-                    haloAnimatedStyle,
-                  ]}
-                />
-                <Animated.View pointerEvents="none" style={[styles.rimeTile, rimeAnimatedStyle]}>
-                  <Text style={[styles.tileText, { fontSize: tileSize * 0.42 }]}>{exerciseData?.rime}</Text>
-                  {isPlayingRime && (
-                    <View style={[styles.audioIndicator, { padding: Math.max(4, tileSize * 0.08) }]}>
-                      <Volume2 size={Math.max(16, tileSize * 0.25)} color="#FFFFFF" />
-                    </View>
-                  )}
-                </Animated.View>
+      <View style={styles.stageArea}>
+        <View
+          style={[
+            styles.board,
+            {
+              width: boardWidth,
+              height: boardHeight,
+              borderRadius: Math.max(24, boardWidth * 0.04),
+            },
+          ]}
+        >
+          <Animated.View style={[styles.flashOverlay, flashStyle]} pointerEvents="none" />
 
-                <Animated.View
-                  {...panResponder.panHandlers}
-                  style={[styles.onsetTile, onsetAnimatedStyle]}
-                >
-                  <Text style={[styles.tileText, { fontSize: tileSize * 0.42 }]}>{exerciseData?.onset}</Text>
-                  {isPlayingOnset && (
-                    <View style={[styles.audioIndicator, { padding: Math.max(4, tileSize * 0.08) }]}>
-                      <Volume2 size={Math.max(16, tileSize * 0.25)} color="#FFFFFF" />
-                    </View>
-                  )}
-                </Animated.View>
-              </>
-            )}
+          {stage === "drag" && (
+            <>
+              <Animated.View
+                style={[
+                  styles.dropHalo,
+                  {
+                    width: tileSize * 2,
+                    height: tileSize * 2,
+                    borderRadius: tileSize,
+                  },
+                  haloStyle,
+                ]}
+                pointerEvents="none"
+              />
+              <Animated.View style={[styles.tile, styles.rimeTile, rimeStyle]} pointerEvents="none">
+                <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData.rime}</Text>
+                {isPlayingRime && (
+                  <View style={[styles.audioChip, { padding: Math.max(4, tileSize * 0.08) }]}>
+                    <Volume2 size={Math.max(16, tileSize * 0.25)} color="#FFFFFF" />
+                  </View>
+                )}
+              </Animated.View>
+              <Animated.View
+                {...panResponder.panHandlers}
+                style={[styles.tile, styles.onsetTile, onsetStyle]}
+              >
+                <Text style={[styles.tileText, { fontSize: tileSize * 0.4 }]}>{exerciseData.onset}</Text>
+                {isPlayingOnset && (
+                  <View style={[styles.audioChip, { padding: Math.max(4, tileSize * 0.08) }]}>
+                    <Volume2 size={Math.max(16, tileSize * 0.25)} color="#FFFFFF" />
+                  </View>
+                )}
+              </Animated.View>
+            </>
+          )}
 
-            {stage === "merged" && (
-              <View style={styles.mergedContainer}>
-                <View
-                  style={[
-                    styles.wordCard,
-                    {
-                      padding: isLandscape ? Math.max(20, width * 0.025) : Math.max(28, width * 0.05),
-                    },
-                  ]}
-                >
-                  <Text style={[styles.wordEmoji, { fontSize: isLandscape ? 70 : 90 }]}>{exerciseData?.image}</Text>
-                  <Text style={[styles.wordText, { fontSize: isLandscape ? 40 : 54 }]}>{exerciseData?.word}</Text>
-                </View>
-              </View>
-            )}
-          </View>
+          {stage === "merged" && (
+            <View style={styles.revealCard}>
+              <Text style={[styles.wordEmoji, { fontSize: isLandscape ? 80 : 96 }]}>{exerciseData.image}</Text>
+              <Text style={[styles.wordText, { fontSize: isLandscape ? 44 : 56 }]}>{exerciseData.word}</Text>
+            </View>
+          )}
         </View>
+
         {showFeedback && (
-          <View
-            style={[
-              styles.feedbackContainer,
-              { bottom: insets.bottom + Math.max(24, height * 0.04) },
-            ]}
-          >
-            <Text
-              style={[
-                styles.feedbackEmoji,
-                { fontSize: Math.max(34, Math.min(80, Math.round((isLandscape ? height : width) * 0.08))) },
-              ]}
-            >
-              🎉
-            </Text>
-            <Text
-              style={[
-                styles.feedbackText,
-                { fontSize: Math.max(18, Math.min(32, Math.round((isLandscape ? height : width) * 0.035))) },
-              ]}
-            >
-              Great job!
-            </Text>
+          <View style={styles.feedbackBubble}>
+            <Text style={[styles.feedbackEmoji, { fontSize: Math.max(36, width * 0.06) }]}>🎉</Text>
+            <Text style={[styles.feedbackText, { fontSize: Math.max(18, width * 0.03) }]}>Great job!</Text>
           </View>
         )}
       </View>
@@ -447,24 +394,23 @@ export default function SoundSlideScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFF8E1",
+    backgroundColor: "#FFF7DC",
   },
   header: {
-    paddingVertical: 12,
+    width: "100%",
   },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     flexWrap: "wrap",
-    columnGap: 12,
-    rowGap: 8,
+    gap: 12,
   },
   instructionText: {
-    fontWeight: "700",
-    color: "#EBA937",
     textAlign: "center",
-    marginTop: 6,
+    color: "#B37400",
+    fontWeight: "700",
+    marginTop: 8,
   },
   progressText: {
     color: "#6B6B6B",
@@ -477,25 +423,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: "#FFE7A4",
+    backgroundColor: "#FFE7B0",
   },
   replayText: {
     fontWeight: "600",
     color: "#1A1A1A",
   },
-  gameArea: {
+  stageArea: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  boardOuter: {
-    width: "100%",
-    alignItems: "center",
-  },
   board: {
     backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.08)",
+    borderWidth: 2,
+    borderColor: "rgba(0,0,0,0.05)",
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
@@ -504,72 +446,54 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 1,
   },
-  onsetTile: {
+  dropHalo: {
     position: "absolute",
-    width: "auto",
-    height: "auto",
-    paddingHorizontal: 6,
-    paddingVertical: 6,
+    borderWidth: 3,
+    borderColor: "rgba(78,205,196,0.45)",
+    backgroundColor: "rgba(78,205,196,0.08)",
+  },
+  tile: {
+    position: "absolute",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#FF6B9D",
-    borderRadius: 32,
+    padding: 12,
+    borderRadius: 28,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 8,
+  },
+  onsetTile: {
+    backgroundColor: "#FF6B9D",
   },
   rimeTile: {
-    position: "absolute",
-    width: "auto",
-    height: "auto",
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-    justifyContent: "center",
-    alignItems: "center",
     backgroundColor: "#4ECDC4",
-    borderRadius: 32,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 8,
   },
   tileText: {
-    fontWeight: "800",
     color: "#FFFFFF",
+    fontWeight: "800",
+    letterSpacing: 1,
   },
-  audioIndicator: {
+  audioChip: {
     position: "absolute",
     top: 6,
     right: 6,
+    borderRadius: 999,
     backgroundColor: "rgba(0,0,0,0.35)",
-    borderRadius: 16,
   },
-  dropHalo: {
-    position: "absolute",
-    backgroundColor: "rgba(255,255,255,0.28)",
-    borderWidth: 3,
-    borderColor: "rgba(78,205,196,0.5)",
-    zIndex: 0,
-  },
-  mergedContainer: {
-    flex: 1,
-    width: "100%",
+  revealCard: {
     justifyContent: "center",
     alignItems: "center",
-  },
-  wordCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#FFF1C1",
     borderRadius: 32,
-    alignItems: "center",
+    paddingHorizontal: 32,
+    paddingVertical: 24,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.2,
     shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
     elevation: 10,
-    minWidth: 220,
   },
   wordEmoji: {
     marginBottom: 16,
@@ -578,26 +502,32 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#1A1A1A",
   },
-  feedbackContainer: {
+  feedbackBubble: {
     position: "absolute",
+    bottom: 24,
     alignSelf: "center",
     backgroundColor: "#E8F5E9",
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderRadius: 24,
+    paddingHorizontal: 28,
+    paddingVertical: 18,
+    borderRadius: 999,
+    flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 12,
     shadowColor: "#000",
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    elevation: 8,
+    elevation: 6,
   },
   feedbackEmoji: {
-    marginBottom: 8,
+    lineHeight: 40,
   },
   feedbackText: {
     fontWeight: "700",
     color: "#2E7D32",
+  },
+  errorText: {
+    fontSize: 18,
+    color: "#444",
   },
 });
