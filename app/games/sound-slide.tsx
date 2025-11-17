@@ -43,6 +43,7 @@ export default function SoundSlideScreen() {
   const [isPlayingOnset, setIsPlayingOnset] = useState(false);
   const [isPlayingRime, setIsPlayingRime] = useState(false);
   const [audioRestartKey, setAudioRestartKey] = useState(0);
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   const onsetX = useSharedValue(0);
   const onsetY = useSharedValue(0);
@@ -67,9 +68,18 @@ export default function SoundSlideScreen() {
     return Math.max(72, Math.min(180, Math.round(minDim * scale)));
   }, [isLandscape, width, height]);
 
-  const boardWidth = Math.min(width * 0.92, 960);
-  const boardHeight = Math.min(height * (isLandscape ? 0.78 : 0.55), height - (isLandscape ? 140 : 200));
-  const boardPadding = Math.max(16, boardWidth * 0.04);
+  const containerPaddingHorizontal = Math.max(16, width * 0.04);
+  const verticalSpacing = Math.max(24, height * 0.04);
+  const safeHeight = Math.max(
+    220,
+    height - insets.top - insets.bottom - headerHeight - verticalSpacing - 16
+  );
+  const safeWidth = Math.max(260, Math.min(width - containerPaddingHorizontal * 2, 1000));
+  const boardAspect = isLandscape ? 16 / 9 : 4 / 5;
+  const widthFromHeight = safeHeight * boardAspect;
+  const boardWidth = Math.min(safeWidth, widthFromHeight);
+  const boardHeight = boardWidth / boardAspect;
+  const boardPadding = Math.max(12, boardWidth * 0.045);
 
   const positionTiles = useCallback(
     (layout?: LayoutSize) => {
@@ -282,8 +292,6 @@ export default function SoundSlideScreen() {
     [haloSize]
   );
 
-  const containerPaddingHorizontal = Math.max(16, width * 0.04);
-
   return (
     <View
       style={[
@@ -295,7 +303,10 @@ export default function SoundSlideScreen() {
         },
       ]}
     >
-      <View style={[styles.header, { paddingHorizontal: containerPaddingHorizontal }]}>
+      <View
+        style={[styles.header, { paddingHorizontal: containerPaddingHorizontal }]}
+        onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}
+      >
         <View style={styles.headerRow}>
           <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 14 }]}>
             Exercise {exerciseIndex + 1} of {lesson?.exercises.length ?? 0}
@@ -329,8 +340,8 @@ export default function SoundSlideScreen() {
         </Text>
       </View>
 
-      <View style={styles.gameArea}>
-        <View style={styles.boardOuter}>
+      <View style={[styles.gameArea, { paddingVertical: verticalSpacing * 0.35 }]}>
+        <View style={[styles.boardOuter, { paddingVertical: verticalSpacing * 0.3 }]}>
           <View
             style={[
               styles.board,
@@ -445,6 +456,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    flexWrap: "wrap",
+    columnGap: 12,
+    rowGap: 8,
   },
   instructionText: {
     fontWeight: "700",
@@ -475,13 +489,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   boardOuter: {
-    flex: 1,
     width: "100%",
-    justifyContent: "center",
     alignItems: "center",
   },
   board: {
-    backgroundColor: "#FFF1C1",
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "rgba(0,0,0,0.08)",
     justifyContent: "center",
