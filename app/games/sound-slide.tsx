@@ -16,7 +16,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import * as ScreenOrientation from "expo-screen-orientation";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
@@ -61,20 +60,6 @@ export default function SoundSlideScreen() {
   const rimeNormRef = useRef({ x: 0.65, y: 0.5 });
   const audioLoopRef = useRef(true);
   const isCorrectAnswerGiven = useRef(false);
-
-  useEffect(() => {
-    if (Platform.OS !== "web") {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(() =>
-        console.warn("[SoundSlide] Failed to lock orientation")
-      );
-      return () => {
-        ScreenOrientation.unlockAsync().catch(() =>
-          console.warn("[SoundSlide] Failed to unlock orientation")
-        );
-      };
-    }
-    return undefined;
-  }, []);
 
   const tileSize = useMemo(() => {
     const minDim = Math.min(width, height);
@@ -210,6 +195,7 @@ export default function SoundSlideScreen() {
           onsetScale.value = withSpring(1.08);
           dragStartCenter.current = { x: onsetX.value, y: onsetY.value };
         },
+        onPanResponderTerminationRequest: () => false,
         onPanResponderMove: (_evt, gesture) => {
           const gl = gameLayout.current;
           if (!gl) return;
@@ -377,7 +363,7 @@ export default function SoundSlideScreen() {
                     haloAnimatedStyle,
                   ]}
                 />
-                <Animated.View style={[styles.rimeTile, rimeAnimatedStyle]}>
+                <Animated.View pointerEvents="none" style={[styles.rimeTile, rimeAnimatedStyle]}>
                   <Text style={[styles.tileText, { fontSize: tileSize * 0.42 }]}>{exerciseData?.rime}</Text>
                   {isPlayingRime && (
                     <View style={[styles.audioIndicator, { padding: Math.max(4, tileSize * 0.08) }]}>
@@ -421,7 +407,7 @@ export default function SoundSlideScreen() {
           <View
             style={[
               styles.feedbackContainer,
-              { bottom: Math.max(24, height * (isLandscape ? 0.06 : 0.1)) },
+              { bottom: insets.bottom + Math.max(24, height * 0.04) },
             ]}
           >
             <Text
@@ -588,6 +574,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 24,
     alignItems: "center",
+    gap: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,
