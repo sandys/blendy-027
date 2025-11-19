@@ -16,10 +16,12 @@ import { speakText } from "@/utils/audio";
 import { GameLayout } from "@/components/GameLayout";
 import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 import { SyllableSquishData } from "@/types/curriculum";
+import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 
 export default function SyllableSquishScreen() {
-  const { width, height } = useWindowDimensions();
-  const isLandscape = width > height;
+  const layout = useResponsiveLayout();
+  const { isLandscape } = layout;
+
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
@@ -142,8 +144,8 @@ export default function SyllableSquishScreen() {
   };
 
   // Sizing
-  const buttonSize = isLandscape ? height * 0.25 : width * 0.35;
-  const cardSize = isLandscape ? height * 0.4 : width * 0.45;
+  const buttonSize = layout.buttonSize * 2;
+  const cardSize = layout.cardSize;
 
   return (
     <GameLayout

@@ -16,10 +16,12 @@ import { speakText } from "@/utils/audio";
 import { GameLayout } from "@/components/GameLayout";
 import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 import { WordTapperData } from "@/types/curriculum";
+import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 
 export default function WordTapperScreen() {
-  const { width, height } = useWindowDimensions();
-  const isLandscape = width > height;
+  const layout = useResponsiveLayout();
+  const { isLandscape } = layout;
+
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
@@ -171,7 +173,7 @@ export default function WordTapperScreen() {
   }
 
   // Sizing
-  const circleSize = isLandscape ? height * 0.18 : width * 0.18;
+  const circleSize = layout.tileSize;
 
   return (
     <GameLayout

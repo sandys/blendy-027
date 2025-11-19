@@ -15,10 +15,12 @@ import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
 import { GameLayout } from "@/components/GameLayout";
 import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
+import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 
 export default function RhymeMatchScreen() {
-  const { width, height } = useWindowDimensions();
-  const isLandscape = width > height;
+  const layout = useResponsiveLayout();
+  const { isLandscape } = layout;
+  
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
@@ -176,8 +178,8 @@ export default function RhymeMatchScreen() {
   };
 
   // Responsive Sizing
-  const targetSize = isLandscape ? height * 0.4 : width * 0.4;
-  const choiceSize = isLandscape ? height * 0.25 : width * 0.28;
+  const targetSize = layout.cardSize;
+  const choiceSize = layout.cardSize * 0.65;
   
   return (
     <GameLayout

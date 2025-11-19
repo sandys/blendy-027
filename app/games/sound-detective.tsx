@@ -16,10 +16,12 @@ import { speakText } from "@/utils/audio";
 import { GameLayout } from "@/components/GameLayout";
 import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 import { SoundDetectiveData } from "@/types/curriculum";
+import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 
 export default function SoundDetectiveScreen() {
-  const { width, height } = useWindowDimensions();
-  const isLandscape = width > height;
+  const layout = useResponsiveLayout();
+  const { isLandscape } = layout;
+
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
@@ -138,8 +140,8 @@ export default function SoundDetectiveScreen() {
   };
 
   // Sizing
-  const cardSize = isLandscape ? height * 0.35 : width * 0.4;
-  const choiceSize = isLandscape ? height * 0.2 : width * 0.22;
+  const cardSize = layout.cardSize;
+  const choiceSize = layout.tileSize;
 
   return (
     <GameLayout

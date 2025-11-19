@@ -17,6 +17,7 @@ import { Volume2, CheckCircle } from "lucide-react-native";
 import { GameLayout } from "@/components/GameLayout";
 import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 import { WordBuilderData } from "@/types/curriculum";
+import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 
 interface DraggableLetter {
   id: string;
@@ -27,8 +28,9 @@ interface DraggableLetter {
 }
 
 export default function WordBuilderScreen() {
-  const { width, height } = useWindowDimensions();
-  const isLandscape = width > height;
+  const layout = useResponsiveLayout();
+  const { width, height, isLandscape } = layout;
+  
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
@@ -38,7 +40,6 @@ export default function WordBuilderScreen() {
   const exerciseData = exercise?.data as WordBuilderData | undefined;
 
   const [letters, setLetters] = useState<DraggableLetter[]>([]);
-  const [dropZoneLayout, setDropZoneLayout] = useState<LayoutRectangle & { pageX: number, pageY: number } | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [blendedText, setBlendedText] = useState("");
 
@@ -84,12 +85,6 @@ export default function WordBuilderScreen() {
     );
   }
 
-  const handleDropZoneLayout = () => {
-    dropZoneRef.current?.measure((x, y, width, height, pageX, pageY) => {
-      setDropZoneLayout({ x, y, width, height, pageX, pageY });
-    });
-  };
-
   const createPanResponder = (index: number) => {
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -110,40 +105,31 @@ export default function WordBuilderScreen() {
         letters[index].pan.flattenOffset();
         Animated.spring(letters[index].scale, { toValue: 1, useNativeDriver: false }).start();
 
-        // Check drop
-        if (dropZoneLayout) {
-           const { pageX, pageY } = e.nativeEvent;
-           // Check if released point is within drop zone
-           // Note: e.nativeEvent.pageX/Y are reliable on native. On web sometimes tricky.
-           // gesture.moveX/Y is better.
-           const releaseX = gesture.moveX;
-           const releaseY = gesture.moveY;
+        // Measure drop zone on release for accuracy
+        dropZoneRef.current?.measure((x, y, width, height, pageX, pageY) => {
+             // gesture.moveX/Y are reliable on native
+             const releaseX = gesture.moveX;
+             const releaseY = gesture.moveY;
 
-           if (
-             releaseX >= dropZoneLayout.pageX &&
-             releaseX <= dropZoneLayout.pageX + dropZoneLayout.width &&
-             releaseY >= dropZoneLayout.pageY &&
-             releaseY <= dropZoneLayout.pageY + dropZoneLayout.height
-           ) {
-             // Dropped!
-             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-             
-             const updated = [...letters];
-             updated[index].isPlaced = true;
-             setLetters(updated);
-             
-             // Reset position visually (it disappears from bank, appears in box? Or just snaps?)
-             // Current logic: `isPlaced` makes it render differently or disappear from bank.
-             // I'll hide it from bank and show it in drop zone.
-             
-             checkCompletion(updated);
-           } else {
-             // Return to start
-             Animated.spring(letters[index].pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
-           }
-        } else {
-           Animated.spring(letters[index].pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
-        }
+             if (
+               releaseX >= pageX &&
+               releaseX <= pageX + width &&
+               releaseY >= pageY &&
+               releaseY <= pageY + height
+             ) {
+               // Dropped!
+               if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+               
+               const updated = [...letters];
+               updated[index].isPlaced = true;
+               setLetters(updated);
+               
+               checkCompletion(updated);
+             } else {
+               // Return to start
+               Animated.spring(letters[index].pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
+             }
+        });
       }
     });
   };
@@ -179,9 +165,9 @@ export default function WordBuilderScreen() {
   };
 
   // Styles
-  const dropZoneWidth = isLandscape ? width * 0.4 : width * 0.8;
-  const dropZoneHeight = isLandscape ? height * 0.3 : height * 0.2;
-  const tileSize = isLandscape ? height * 0.15 : width * 0.18;
+  const dropZoneWidth = layout.safeWidth * 0.5;
+  const dropZoneHeight = layout.safeHeight * 0.25;
+  const tileSize = layout.tileSize;
 
   return (
     <GameLayout
@@ -196,7 +182,6 @@ export default function WordBuilderScreen() {
           <View style={[styles.dropZoneSection, { flex: isLandscape ? 0.5 : 0.45 }]}>
              <View 
                ref={dropZoneRef}
-               onLayout={handleDropZoneLayout}
                style={[
                  styles.dropZone,
                  { 
@@ -285,8 +270,7 @@ const styles = StyleSheet.create({
   bankSection: {
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 2, // Bank needs higher zIndex for draggables usually? No, draggables need to escape.
-               // Ideally draggables are rendered in a portal or absolute overlay, but PanResponder translation works if overflow is visible.
+    zIndex: 2, 
   },
   dropZone: {
     borderWidth: 4,

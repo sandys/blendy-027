@@ -23,7 +23,7 @@ const PHONEME_MAP: Record<string, string> = {
   "p": "puh",
   "q": "kuh",
   "r": "rrr",
-  "s": "sss",
+  "s": "ss", // Changed to 'ss' for a more accurate /s/ phoneme sound, avoiding repetition of letter name
   "t": "tuh",
   "u": "uh",
   "v": "vvv",

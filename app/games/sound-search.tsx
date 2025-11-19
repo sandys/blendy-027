@@ -17,10 +17,12 @@ import { speakText } from "@/utils/audio";
 import { GameLayout } from "@/components/GameLayout";
 import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 import { SoundSearchData } from "@/types/curriculum";
+import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 
 export default function SoundSearchScreen() {
-  const { width, height } = useWindowDimensions();
-  const isLandscape = width > height;
+  const layout = useResponsiveLayout();
+  const { isLandscape } = layout;
+
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
@@ -35,9 +37,9 @@ export default function SoundSearchScreen() {
   const flyAnim = useRef(new Animated.Value(0)).current;
   const audioLoopRef = useRef<boolean>(true);
 
-  // Layout capture
-  const blankLayout = useRef<LayoutRectangle | null>(null);
-  const choiceLayouts = useRef<Record<number, LayoutRectangle>>({});
+  // Layout capture using refs (safer than onLayout for dynamic measurement)
+  const blankRef = useRef<View>(null);
+  const choiceRefs = useRef<Array<View | null>>([]);
 
   const lesson = SAMPLE_LESSONS.find((l) => l.lesson_number === lessonNumber);
   const exercise = lesson?.exercises[exerciseIndex];
@@ -88,43 +90,51 @@ export default function SoundSearchScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
 
-      // Prepare animation
-      const start = choiceLayouts.current[index];
-      const end = blankLayout.current;
+      // Measure start and end positions dynamically using refs
+      const startRef = choiceRefs.current[index];
+      const endRef = blankRef.current;
 
-      if (start && end) {
-        setFlyingBubble({
-          text: choice.label,
-          start,
-          end,
-        });
+      if (startRef && endRef) {
+          startRef.measure((x, y, width, height, pageX, pageY) => {
+              const startLayout = { x: pageX, y: pageY, width, height };
+              
+              endRef.measure((ex, ey, ewidth, eheight, ePageX, ePageY) => {
+                  const endLayout = { x: ePageX, y: ePageY, width: ewidth, height: eheight };
 
-        Animated.timing(flyAnim, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: false, // Layout animation needs JS driver usually for absolute positioning
-        }).start(() => {
-          setRevealedWord(exerciseData.word);
-          setFlyingBubble(null);
+                  setFlyingBubble({
+                    text: choice.label,
+                    start: startLayout,
+                    end: endLayout,
+                  });
           
-          // Play full word
-          speakText(exerciseData.word);
-
-          // Next level
-          setTimeout(() => {
-            const nextExerciseIndex = exerciseIndex + 1;
-            if (lesson && nextExerciseIndex < lesson.exercises.length) {
-              router.setParams({
-                lesson: lessonNumber,
-                exercise: nextExerciseIndex,
+                  Animated.timing(flyAnim, {
+                    toValue: 1,
+                    duration: 600,
+                    useNativeDriver: false, 
+                  }).start(() => {
+                    setRevealedWord(exerciseData.word);
+                    setFlyingBubble(null);
+                    
+                    // Play full word
+                    speakText(exerciseData.word);
+          
+                    // Next level
+                    setTimeout(() => {
+                      const nextExerciseIndex = exerciseIndex + 1;
+                      if (lesson && nextExerciseIndex < lesson.exercises.length) {
+                        router.setParams({
+                          lesson: lessonNumber,
+                          exercise: nextExerciseIndex,
+                        });
+                      } else {
+                        router.back();
+                      }
+                    }, 2000);
+                  });
               });
-            } else {
-              router.back();
-            }
-          }, 2000);
-        });
+          });
       } else {
-        // Fallback if layout missing
+        // Fallback if refs/measure fail
         setRevealedWord(exerciseData.word);
         speakText(exerciseData.word);
         setTimeout(router.back, 2000);
@@ -135,13 +145,14 @@ export default function SoundSearchScreen() {
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
-      speakText(choice.label); // Just say the wrong sound
+      // Negative Feedback
+      speakText("Not quite. Try again.");
     }
   };
 
   // Styles
-  const bubbleSize = isLandscape ? height * 0.2 : width * 0.22;
-  const imageSize = isLandscape ? height * 0.4 : width * 0.5;
+  const bubbleSize = layout.tileSize;
+  const imageSize = layout.cardSize;
 
   return (
     <GameLayout
@@ -159,19 +170,9 @@ export default function SoundSearchScreen() {
           <View style={styles.wordRow}>
             {/* The Blank/Revealed Spot */}
             <View 
+              ref={blankRef}
               style={[styles.blankSlot, { minWidth: bubbleSize * 0.8 }]}
-              onLayout={(e) => {
-                // We need absolute coordinates. 
-                // Simplified: We'll just capture layout relative to parent and use a full-screen overlay for flying bubble?
-                // Or simpler: Just layout relative to this view?
-                // Since we use a common parent, we can assume relative coords might work if we subtract offsets.
-                // Actually, `measure` is better for "flying across containers".
-                // But let's stick to `onLayout` and just ensure we animate safely.
-                // For this prototype, let's assume the containers are aligned or use a simplified approach.
-                e.target.measure((x, y, width, height, pageX, pageY) => {
-                    blankLayout.current = { x: pageX, y: pageY, width, height };
-                });
-              }}
+              // We don't strictly need onLayout if we use measure on ref, but keeping it doesn't hurt
             >
               <Text style={[styles.wordText, { fontSize: 32 }]}>
                 {revealedWord ? exerciseData.word : exerciseData.wordWithBlank}
@@ -187,6 +188,7 @@ export default function SoundSearchScreen() {
             {exerciseData.choices.map((choice, index) => (
               <TouchableOpacity
                 key={index}
+                ref={el => { choiceRefs.current[index] = el; }}
                 style={[
                   styles.bubble,
                   {
@@ -196,11 +198,6 @@ export default function SoundSearchScreen() {
                   }
                 ]}
                 onPress={() => handleChoicePress(index)}
-                onLayout={(e) => {
-                   e.target.measure((x, y, width, height, pageX, pageY) => {
-                      choiceLayouts.current[index] = { x: pageX, y: pageY, width, height };
-                   });
-                }}
               >
                 <Text style={styles.bubbleText}>{choice.label}</Text>
               </TouchableOpacity>

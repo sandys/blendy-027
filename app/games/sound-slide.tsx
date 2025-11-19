@@ -15,10 +15,12 @@ import { speakText, stopSpeaking } from "@/utils/audio";
 import { GameLayout } from "@/components/GameLayout";
 import { COLORS, SPACING } from "@/constants/theme";
 import { SoundSlideData } from "@/types/curriculum";
+import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 
 export default function SoundSlideScreen() {
-  const { width, height } = useWindowDimensions();
-  const isLandscape = width > height;
+  const layout = useResponsiveLayout();
+  const { width, height, isLandscape } = layout;
+  
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
@@ -30,14 +32,11 @@ export default function SoundSlideScreen() {
   const [stage, setStage] = useState<"drag" | "merged">("drag");
   const [showFeedback, setShowFeedback] = useState(false);
   
-    // Layout Dimensions
-    const tileSize = isLandscape ? Math.min(height * 0.25, 120) : Math.min(width * 0.25, 100);
-    // Track width is the distance the tile travels. 
-    // We want the whole interactive area (start tile + track + end tile) to fit safely.
-    // Safe margin: 15% on each side.
-    const trackWidth = isLandscape ? width * 0.5 : width * 0.6;
-    
-    // Standard Animated Values
+  // Layout Dimensions
+  const tileSize = layout.tileSize;
+  const trackWidth = layout.soundSlide.trackWidth;
+  
+  // Standard Animated Values
     const pan = useRef(new Animated.ValueXY()).current;
     const scale = useRef(new Animated.Value(1)).current;
   
