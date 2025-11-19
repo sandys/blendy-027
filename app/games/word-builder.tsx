@@ -7,540 +7,351 @@ import {
   PanResponder,
   useWindowDimensions,
   Platform,
+  LayoutRectangle,
 } from "react-native";
 import * as Haptics from "expo-haptics";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
 import { Volume2, CheckCircle } from "lucide-react-native";
-
-type BuildStage = "initial" | "first-blend" | "final-blend" | "complete";
+import { GameLayout } from "@/components/GameLayout";
+import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
+import { WordBuilderData } from "@/types/curriculum";
 
 interface DraggableLetter {
   id: string;
   letter: string;
-  position: Animated.ValueXY;
-  isInDropZone: boolean;
+  pan: Animated.ValueXY;
   scale: Animated.Value;
+  isPlaced: boolean;
 }
 
 export default function WordBuilderScreen() {
-  const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
 
   const lesson = SAMPLE_LESSONS.find((l) => l.lesson_number === lessonNumber);
   const exercise = lesson?.exercises[exerciseIndex];
+  const exerciseData = exercise?.data as WordBuilderData | undefined;
 
-  const exerciseData = exercise?.data as
-    | { word: string; letters: string[]; image?: string }
-    | undefined;
+  const [letters, setLetters] = useState<DraggableLetter[]>([]);
+  const [dropZoneLayout, setDropZoneLayout] = useState<LayoutRectangle & { pageX: number, pageY: number } | null>(null);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [blendedText, setBlendedText] = useState("");
 
-  const [stage, setStage] = useState<BuildStage>("initial");
-  const [playingLetterIndex, setPlayingLetterIndex] = useState<number | null>(null);
-  const [showSuccess, setShowSuccess] = useState<boolean>(false);
-  const [draggableLetters, setDraggableLetters] = useState<DraggableLetter[]>([]);
-  const [blendedText, setBlendedText] = useState<string>("");
-  const audioLoopRef = useRef<boolean>(true);
-  const isCorrectAnswerGiven = useRef<boolean>(false);
-  const dropZoneLayout = useRef<{ pageX: number; pageY: number; width: number; height: number } | null>(null);
-  const dropZoneRef = useRef<View | null>(null);
-  const letterLayoutsRef = useRef<Map<number, { x: number; y: number; width: number; height: number }>>(new Map());
-  const flashAnim = useRef(new Animated.Value(0)).current;
-
-  const isLandscape = width > height;
-  const tileSize = isLandscape ? Math.min(width * 0.12, 90) : Math.min(width * 0.2, 110);
-  const dropZoneWidth = isLandscape ? width * 0.4 : width * 0.7;
-  const dropZoneHeight = tileSize + 40;
-  const wordCardPadding = isLandscape ? 30 : 50;
+  const dropZoneRef = useRef<View>(null);
+  const audioLoopRef = useRef(true);
 
   useEffect(() => {
     if (!exerciseData) return;
-
-    const letters: DraggableLetter[] = exerciseData.letters.map((letter, index) => ({
-      id: `letter-${index}`,
-      letter,
-      position: new Animated.ValueXY({ x: 0, y: 0 }),
-      isInDropZone: false,
+    
+    const newLetters = exerciseData.letters.map((l, i) => ({
+      id: `${i}-${l}`,
+      letter: l,
+      pan: new Animated.ValueXY(),
       scale: new Animated.Value(1),
+      isPlaced: false,
     }));
-
-    setDraggableLetters(letters);
-  }, [exerciseData]);
-
-  useEffect(() => {
-    if (!exerciseData || stage !== "initial") return;
-
+    setLetters(newLetters);
+    setIsSuccess(false);
+    setBlendedText("");
     audioLoopRef.current = true;
-    isCorrectAnswerGiven.current = false;
 
-    const playInitialFeedback = async () => {
-      Animated.sequence([
-        Animated.timing(flashAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-        Animated.timing(flashAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-      ]).start();
-
-      if (Platform.OS !== "web") {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 500));
+    const playIntro = async () => {
+       await new Promise(resolve => setTimeout(resolve, 500));
+       // Speak individual sounds
+       for (const l of exerciseData.letters) {
+          if (!audioLoopRef.current) break;
+          await speakText(l, { usePhoneme: true });
+          await new Promise(resolve => setTimeout(resolve, 500));
+       }
     };
-
-    const playAudioLoop = async () => {
-      await playInitialFeedback();
-
-      while (audioLoopRef.current && !isCorrectAnswerGiven.current && stage === "initial") {
-        for (let i = 0; i < exerciseData.letters.length; i++) {
-          if (!audioLoopRef.current || isCorrectAnswerGiven.current) break;
-
-          setPlayingLetterIndex(i);
-          await speakText(exerciseData.letters[i], { usePhoneme: true });
-          await new Promise((resolve) => setTimeout(resolve, 600));
-        }
-
-        setPlayingLetterIndex(null);
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-      }
-    };
-
-    playAudioLoop();
+    playIntro();
 
     return () => {
       audioLoopRef.current = false;
     };
-  }, [exerciseIndex, exerciseData, stage, flashAnim]);
+  }, [exerciseIndex, exerciseData]);
 
-  if (!exercise || exercise.exercise_type !== "Word Builder") {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Exercise not found</Text>
-      </View>
+  if (!exerciseData) {
+     return (
+      <GameLayout>
+        <Text style={{ color: COLORS.error }}>Exercise not found</Text>
+      </GameLayout>
     );
   }
 
-  const createPanResponder = (letterIndex: number) => {
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        if (Platform.OS !== "web") {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        }
-        Animated.spring(draggableLetters[letterIndex].scale, {
-          toValue: 1.1,
-          useNativeDriver: false,
-          friction: 3,
-        }).start();
-      },
-      onPanResponderMove: (_, gesture) => {
-        draggableLetters[letterIndex].position.setValue({
-          x: gesture.dx,
-          y: gesture.dy,
-        });
-      },
-      onPanResponderRelease: (evt, gesture) => {
-        Animated.spring(draggableLetters[letterIndex].scale, {
-          toValue: 1,
-          useNativeDriver: false,
-          friction: 3,
-        }).start();
-
-        if (!dropZoneLayout.current) {
-          Animated.spring(draggableLetters[letterIndex].position, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: false,
-            friction: 5,
-          }).start();
-          return;
-        }
-
-        const letterLayout = letterLayoutsRef.current.get(letterIndex);
-        if (!letterLayout) {
-          Animated.spring(draggableLetters[letterIndex].position, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: false,
-            friction: 5,
-          }).start();
-          return;
-        }
-
-        const dropZone = dropZoneLayout.current;
-        const releasePageX = (evt?.nativeEvent as any)?.pageX ?? 0;
-        const releasePageY = (evt?.nativeEvent as any)?.pageY ?? 0;
-
-        const isInDropZone =
-          releasePageX >= dropZone.pageX &&
-          releasePageX <= dropZone.pageX + dropZone.width &&
-          releasePageY >= dropZone.pageY &&
-          releasePageY <= dropZone.pageY + dropZone.height;
-
-        if (isInDropZone) {
-          if (Platform.OS !== "web") {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          }
-
-          const updatedLetters = [...draggableLetters];
-          updatedLetters[letterIndex].isInDropZone = true;
-          setDraggableLetters(updatedLetters);
-
-          Animated.spring(draggableLetters[letterIndex].position, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: false,
-            friction: 5,
-          }).start();
-
-          checkBlendCompletion(updatedLetters);
-        } else {
-          Animated.spring(draggableLetters[letterIndex].position, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: false,
-            friction: 5,
-          }).start();
-        }
-      },
+  const handleDropZoneLayout = () => {
+    dropZoneRef.current?.measure((x, y, width, height, pageX, pageY) => {
+      setDropZoneLayout({ x, y, width, height, pageX, pageY });
     });
   };
 
-  const checkBlendCompletion = async (letters: DraggableLetter[]) => {
-    const allInDropZone = letters.every((l) => l.isInDropZone);
+  const createPanResponder = (index: number) => {
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Animated.spring(letters[index].scale, { toValue: 1.2, useNativeDriver: false }).start();
+        letters[index].pan.setOffset({
+          x: (letters[index].pan.x as any)._value,
+          y: (letters[index].pan.y as any)._value,
+        });
+        letters[index].pan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event(
+        [null, { dx: letters[index].pan.x, dy: letters[index].pan.y }],
+        { useNativeDriver: false }
+      ),
+      onPanResponderRelease: (e, gesture) => {
+        letters[index].pan.flattenOffset();
+        Animated.spring(letters[index].scale, { toValue: 1, useNativeDriver: false }).start();
 
-    if (!allInDropZone) {
-      const inDropZone = letters.filter((l) => l.isInDropZone);
-      if (inDropZone.length > 0) {
-        const partialBlend = inDropZone.map((l) => l.letter).join("");
-        setBlendedText(partialBlend);
-        audioLoopRef.current = false;
-        setPlayingLetterIndex(null);
-        await speakText(partialBlend, { usePhoneme: false, rate: 0.7 });
+        // Check drop
+        if (dropZoneLayout) {
+           const { pageX, pageY } = e.nativeEvent;
+           // Check if released point is within drop zone
+           // Note: e.nativeEvent.pageX/Y are reliable on native. On web sometimes tricky.
+           // gesture.moveX/Y is better.
+           const releaseX = gesture.moveX;
+           const releaseY = gesture.moveY;
+
+           if (
+             releaseX >= dropZoneLayout.pageX &&
+             releaseX <= dropZoneLayout.pageX + dropZoneLayout.width &&
+             releaseY >= dropZoneLayout.pageY &&
+             releaseY <= dropZoneLayout.pageY + dropZoneLayout.height
+           ) {
+             // Dropped!
+             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+             
+             const updated = [...letters];
+             updated[index].isPlaced = true;
+             setLetters(updated);
+             
+             // Reset position visually (it disappears from bank, appears in box? Or just snaps?)
+             // Current logic: `isPlaced` makes it render differently or disappear from bank.
+             // I'll hide it from bank and show it in drop zone.
+             
+             checkCompletion(updated);
+           } else {
+             // Return to start
+             Animated.spring(letters[index].pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
+           }
+        } else {
+           Animated.spring(letters[index].pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
+        }
       }
-      return;
-    }
+    });
+  };
 
-    isCorrectAnswerGiven.current = true;
-    audioLoopRef.current = false;
-    setPlayingLetterIndex(null);
-    setShowSuccess(true);
+  const checkCompletion = (currentLetters: DraggableLetter[]) => {
+    const placed = currentLetters.filter(l => l.isPlaced);
+    
+    // Speak partial blend
+    const partial = placed.map(l => l.letter).join("");
+    setBlendedText(partial);
+    speakText(partial, { usePhoneme: false }); // Say as word part
 
-    const fullWord = exerciseData?.word || "";
-    setBlendedText(fullWord);
-
-    if (Platform.OS !== "web") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-
-    await speakText(fullWord, { usePhoneme: false, rate: 0.7 });
-
-    setTimeout(() => {
-      setStage("complete");
+    if (placed.length === currentLetters.length) {
+      setIsSuccess(true);
+      audioLoopRef.current = false;
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      // Speak full word
+      speakText(exerciseData.word);
 
       setTimeout(() => {
-        const nextExerciseIndex = exerciseIndex + 1;
-        if (lesson && nextExerciseIndex < lesson.exercises.length) {
-          router.replace({
-            pathname: "/games/word-builder",
-            params: { lesson: lessonNumber, exercise: nextExerciseIndex },
-          });
-        } else {
-          router.back();
-        }
+          const nextExerciseIndex = exerciseIndex + 1;
+          if (lesson && nextExerciseIndex < lesson.exercises.length) {
+            router.replace({
+              pathname: "/games/word-builder",
+              params: { lesson: lessonNumber, exercise: nextExerciseIndex },
+            });
+          } else {
+            router.back();
+          }
       }, 2500);
-    }, 1000);
-  };
-
-  const getInstructionText = () => {
-    switch (stage) {
-      case "initial":
-        return "Drag the letters into the box to blend them";
-      case "complete":
-        return "You built the word!";
-      default:
-        return "";
     }
   };
 
-  const flashColor = flashAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["rgba(33, 150, 243, 0)", "rgba(33, 150, 243, 0.3)"],
-  });
+  // Styles
+  const dropZoneWidth = isLandscape ? width * 0.4 : width * 0.8;
+  const dropZoneHeight = isLandscape ? height * 0.3 : height * 0.2;
+  const tileSize = isLandscape ? height * 0.15 : width * 0.18;
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          paddingLeft: insets.left,
-          paddingRight: insets.right,
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
-        },
-      ]}
+    <GameLayout
+      instruction="Drag letters to build the word"
+      progress={`Exercise ${exerciseIndex + 1} of ${lesson?.exercises.length || 0}`}
+      primaryColor={COLORS.wordBuilder.primary}
+      backgroundColor={COLORS.wordBuilder.background}
     >
-      <Animated.View style={[styles.flashOverlay, { backgroundColor: flashColor }]} pointerEvents="none" />
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={[styles.progressText, { fontSize: isLandscape ? 14 : 16 }]}>
-            Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
-          </Text>
-          <Text style={[styles.instructionText, { fontSize: isLandscape ? 20 : 24 }]}>
-            {getInstructionText()}
-          </Text>
-        </View>
-
-        <View style={styles.buildArea}>
-          {stage === "initial" && (
-            <>
-              <View
-                style={[
-                  styles.dropZone,
-                  {
-                    width: dropZoneWidth,
-                    height: dropZoneHeight,
-                    borderColor: showSuccess ? "#4CAF50" : "#2196F3",
-                    backgroundColor: showSuccess ? "rgba(76, 175, 80, 0.1)" : "rgba(33, 150, 243, 0.1)",
-                  },
-                ]}
-                ref={(r) => {
-                  dropZoneRef.current = r;
-                }}
-                onLayout={() => {
-                  try {
-                    dropZoneRef.current?.measureInWindow((pageX, pageY, width, height) => {
-                      dropZoneLayout.current = { pageX, pageY, width, height };
-                      console.log('[WordBuilder] Drop zone layout (absolute):', dropZoneLayout.current);
-                    });
-                  } catch (e) {
-                    console.log('[WordBuilder] measureInWindow error', e);
-                  }
-                }}
-              >
-                {blendedText ? (
-                  <View style={styles.blendedContainer}>
-                    <Text style={[styles.blendedText, { fontSize: tileSize * 0.5, color: showSuccess ? "#4CAF50" : "#2196F3" }]}>{blendedText}</Text>
-                    {showSuccess && <CheckCircle size={tileSize * 0.4} color="#4CAF50" fill="#4CAF50" />}
-                  </View>
-                ) : (
-                  <Text style={[styles.dropZoneText, { fontSize: isLandscape ? 16 : 18 }]}>Drop letters here</Text>
-                )}
-              </View>
-
-              <View style={[styles.lettersRow, { gap: isLandscape ? 15 : 20, marginTop: isLandscape ? 30 : 40 }]}>
-                {draggableLetters.map((draggableLetter, index) => {
-                  if (draggableLetter.isInDropZone) {
-                    return <View key={draggableLetter.id} style={{ width: tileSize, height: tileSize }} />;
-                  }
-
-                  const panResponder = createPanResponder(index);
-
-                  return (
-                    <Animated.View
-                      key={draggableLetter.id}
-                      testID={`letter-${index}`}
-                      {...panResponder.panHandlers}
-                      style={[
-                        styles.letterTile,
-                        {
-                          width: tileSize,
-                          height: tileSize,
-                          borderRadius: tileSize * 0.18,
-                        },
-                        playingLetterIndex === index && styles.letterTilePlaying,
-                        {
-                          transform: [
-                            { translateX: draggableLetter.position.x },
-                            { translateY: draggableLetter.position.y },
-                            { scale: draggableLetter.scale },
-                          ],
-                        },
-                      ]}
-                      onLayout={(event) => {
-                        const { x, y, width, height } = event.nativeEvent.layout;
-                        letterLayoutsRef.current.set(index, { x, y, width, height });
-                        console.log('[WordBuilder] Letter layout (relative to lettersRow):', { index, x, y, width, height });
-                      }}
-                    >
-                      <Text style={[styles.letterText, { fontSize: tileSize * 0.44 }]}>
-                        {draggableLetter.letter}
-                      </Text>
-                      {playingLetterIndex === index && (
-                        <View style={styles.audioIndicator}>
-                          <Volume2 size={tileSize * 0.18} color="#FFFFFF" />
+       <View style={[styles.container, { flexDirection: isLandscape ? 'row' : 'column' }]}>
+          
+          {/* Left/Top: Drop Zone */}
+          <View style={[styles.dropZoneSection, { flex: isLandscape ? 0.5 : 0.45 }]}>
+             <View 
+               ref={dropZoneRef}
+               onLayout={handleDropZoneLayout}
+               style={[
+                 styles.dropZone,
+                 { 
+                   width: dropZoneWidth, 
+                   height: dropZoneHeight,
+                   borderColor: isSuccess ? COLORS.success : COLORS.wordBuilder.primary,
+                   backgroundColor: isSuccess ? '#E8F5E9' : COLORS.white,
+                 }
+               ]}
+             >
+                 {/* Show placed letters inside drop zone */}
+                 <View style={styles.placedLettersRow}>
+                    {letters.filter(l => l.isPlaced).map((l, i) => (
+                        <View key={`placed-${i}`} style={[styles.placedTile, { width: tileSize, height: tileSize }]}>
+                            <Text style={styles.tileText}>{l.letter}</Text>
                         </View>
-                      )}
-                    </Animated.View>
-                  );
-                })}
-              </View>
-            </>
-          )}
+                    ))}
+                    {letters.every(l => !l.isPlaced) && (
+                        <Text style={styles.placeholderText}>Drop Here</Text>
+                    )}
+                 </View>
 
-          {stage === "complete" && (
-            <View style={styles.completeContainer}>
-              <View style={[styles.wordCard, { padding: wordCardPadding }]}>
-                {exerciseData?.image && (
-                  <Text style={[styles.wordEmoji, { fontSize: isLandscape ? 70 : 100 }]}>
-                    {exerciseData.image}
-                  </Text>
-                )}
-                <Text style={[styles.completeWord, { fontSize: isLandscape ? 48 : 64 }]}>
-                  {exerciseData?.word}
-                </Text>
-              </View>
-              <View style={[styles.feedbackContainer, { marginTop: isLandscape ? 20 : 30 }]}>
-                <Text style={[styles.feedbackEmoji, { fontSize: isLandscape ? 50 : 72 }]}>🎉</Text>
-                <Text style={[styles.feedbackText, { fontSize: isLandscape ? 24 : 32 }]}>Amazing!</Text>
-              </View>
-            </View>
-          )}
-        </View>
-      </View>
-    </View>
+                 {isSuccess && (
+                    <View style={styles.successBadge}>
+                        <CheckCircle size={32} color={COLORS.success} />
+                        <Text style={styles.successText}>{exerciseData.word}</Text>
+                    </View>
+                 )}
+             </View>
+          </View>
+
+          {/* Right/Bottom: Letter Bank */}
+          <View style={[styles.bankSection, { flex: isLandscape ? 0.5 : 0.55 }]}>
+             <View style={styles.bankRow}>
+                 {letters.map((letter, index) => {
+                    if (letter.isPlaced) {
+                        // Placeholder to keep layout stable
+                        return <View key={letter.id} style={{ width: tileSize, height: tileSize, margin: SPACING.s }} />;
+                    }
+                    
+                    const panResponder = createPanResponder(index);
+                    
+                    return (
+                        <Animated.View
+                          key={letter.id}
+                          {...panResponder.panHandlers}
+                          style={[
+                              styles.draggableTile,
+                              {
+                                  width: tileSize,
+                                  height: tileSize,
+                                  transform: [
+                                      { translateX: letter.pan.x },
+                                      { translateY: letter.pan.y },
+                                      { scale: letter.scale }
+                                  ],
+                                  margin: SPACING.s,
+                                  zIndex: 999, // Ensure on top while dragging
+                              }
+                          ]}
+                        >
+                            <Text style={styles.tileText}>{letter.letter}</Text>
+                        </Animated.View>
+                    )
+                 })}
+             </View>
+          </View>
+
+       </View>
+    </GameLayout>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#E3F2FD",
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  content: {
-    flex: 1,
+  dropZoneSection: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
   },
-  header: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignItems: "center",
-  },
-  instructionText: {
-    fontWeight: "700" as const,
-    color: "#2196F3",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  progressText: {
-    color: "#999",
-    fontWeight: "600" as const,
-  },
-  buildArea: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
+  bankSection: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2, // Bank needs higher zIndex for draggables usually? No, draggables need to escape.
+               // Ideally draggables are rendered in a portal or absolute overlay, but PanResponder translation works if overflow is visible.
   },
   dropZone: {
-    borderWidth: 3,
-    borderStyle: "dashed",
+    borderWidth: 4,
+    borderStyle: 'dashed',
     borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  dropZoneText: {
-    color: "#2196F3",
-    fontWeight: "600" as const,
+  placedLettersRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: SPACING.s,
   },
-  blendedContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+  placedTile: {
+    backgroundColor: COLORS.wordBuilder.primary,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
   },
-  blendedText: {
-    fontWeight: "800" as const,
-    color: "#2196F3",
-  },
-  lettersRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-  },
-  letterTile: {
-    backgroundColor: "#2196F3",
-    justifyContent: "center",
-    alignItems: "center",
+  draggableTile: {
+    backgroundColor: COLORS.wordBuilder.accent,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowRadius: 4,
   },
-  letterTilePlaying: {
-    borderWidth: 4,
-    borderColor: "#FFFFFF",
-    shadowColor: "#2196F3",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
-    elevation: 10,
+  tileText: {
+    color: COLORS.white,
+    fontSize: 28,
+    fontWeight: 'bold',
   },
-  audioIndicator: {
-    position: "absolute",
-    top: 6,
-    right: 6,
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
+  placeholderText: {
+    color: COLORS.textLight,
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  bankRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  successBadge: {
+    position: 'absolute',
+    bottom: -60,
+    backgroundColor: COLORS.white,
+    padding: SPACING.m,
     borderRadius: 16,
-    padding: 4,
-  },
-  letterText: {
-    fontWeight: "800" as const,
-    color: "#FFFFFF",
-  },
-  completeContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  wordCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 30,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.s,
     elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
-  wordEmoji: {
-    marginBottom: 20,
-  },
-  completeWord: {
-    fontWeight: "800" as const,
-    color: "#1A1A1A",
-  },
-  feedbackContainer: {
-    backgroundColor: "#E8F5E9",
-    padding: 20,
-    borderRadius: 20,
-    alignItems: "center",
-    minWidth: 200,
-  },
-  feedbackEmoji: {
-    marginBottom: 12,
-  },
-  feedbackText: {
-    fontWeight: "700" as const,
-    textAlign: "center",
-    color: "#333",
-  },
-  errorText: {
-    fontSize: 18,
-    color: "#F44336",
-    textAlign: "center",
-  },
-  flashOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
-  },
+  successText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: COLORS.text,
+  }
 });

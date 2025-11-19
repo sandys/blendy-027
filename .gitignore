@@ -1,37 +1,62 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+# Dependencies
 node_modules/
 
-# Expo
+# Expo / React Native
 .expo/
-dist/
 web-build/
-expo-env.d.ts
-
-# Native
-*.orig.*
+dist/
+build/
+coverage/
+*.log
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
+*.orig
+*.bak
+
+# Lock files
+bun.lock
+package-lock.json
+yarn.lock
+
+# IDE specific
+.vscode/
+.idea/
+*.iml
+
+# Android specific
+android/.gradle/
+android/app/build/
+android/app/.cxx/
+android/build/
+android/local.properties
+android/gradle-wrapper.jar
+android/gradle-wrapper.properties
+
+# iOS specific
+ios/build/
+
+# Environment variables
+.env
+.env.local
+.env.*
+!.env.example
 
 # Metro
 .metro-health-check*
 
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
+# TypeScript
+*.tsbuildinfo
 
 # macOS
 .DS_Store
-*.pem
 
-# local env files
-.env*.local
+# Vercel deployment (if applicable)
+.vercel/
 
-# typescript
-*.tsbuildinfo
-.vercel
+# Gemini specific ignores
+.gemini/

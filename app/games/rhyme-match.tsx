@@ -9,15 +9,16 @@ import {
   Platform,
 } from "react-native";
 import * as Haptics from "expo-haptics";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { Volume2 } from "lucide-react-native";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
+import { GameLayout } from "@/components/GameLayout";
+import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 
 export default function RhymeMatchScreen() {
-  const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
@@ -26,13 +27,12 @@ export default function RhymeMatchScreen() {
   const [showFeedback, setShowFeedback] = useState<boolean>(false);
   const [playingAudioIndex, setPlayingAudioIndex] = useState<number | null>(null);
   const [isPlayingTarget, setIsPlayingTarget] = useState<boolean>(false);
-  const [scaleAnims] = useState(
-    [0, 1, 2].map(() => new Animated.Value(1))
-  );
+  
+  // Animations
+  const scaleAnims = useRef([0, 1, 2].map(() => new Animated.Value(1))).current;
   const pulseAnims = useRef([0, 1, 2].map(() => new Animated.Value(1))).current;
   const audioLoopRef = useRef<boolean>(true);
   const isCorrectAnswerGiven = useRef<boolean>(false);
-  const flashAnim = useRef(new Animated.Value(0)).current;
 
   const lesson = SAMPLE_LESSONS.find((l) => l.lesson_number === lessonNumber);
   const exercise = lesson?.exercises[exerciseIndex];
@@ -42,37 +42,19 @@ export default function RhymeMatchScreen() {
     choices: { word: string; image: string; isCorrect: boolean }[];
   } : null;
 
+  // Initialize and Audio Loop
   useEffect(() => {
     if (!exerciseData) return;
 
     audioLoopRef.current = true;
     isCorrectAnswerGiven.current = false;
 
-    const playInitialFeedback = async () => {
-      Animated.sequence([
-        Animated.timing(flashAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-        Animated.timing(flashAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-      ]).start();
-      
-      if (Platform.OS !== "web") {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 500));
-    };
-
     const playAudioLoop = async () => {
-      await playInitialFeedback();
+      // Initial delay
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       while (audioLoopRef.current && !isCorrectAnswerGiven.current) {
+        // Play target
         setIsPlayingTarget(true);
         await speakText(exerciseData.target.word);
         setIsPlayingTarget(false);
@@ -80,14 +62,16 @@ export default function RhymeMatchScreen() {
         
         if (!audioLoopRef.current || isCorrectAnswerGiven.current) break;
         
+        // Play choices
         for (let i = 0; i < exerciseData.choices.length; i++) {
           if (!audioLoopRef.current || isCorrectAnswerGiven.current) break;
           
           setPlayingAudioIndex(i);
           
+          // Pulse animation
           Animated.sequence([
             Animated.timing(pulseAnims[i], {
-              toValue: 1.15,
+              toValue: 1.1,
               duration: 200,
               useNativeDriver: true,
             }),
@@ -103,7 +87,7 @@ export default function RhymeMatchScreen() {
         }
         
         setPlayingAudioIndex(null);
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     };
 
@@ -112,13 +96,13 @@ export default function RhymeMatchScreen() {
     return () => {
       audioLoopRef.current = false;
     };
-  }, [exerciseIndex, exerciseData, pulseAnims, flashAnim]);
+  }, [exerciseIndex, exerciseData]);
 
   if (!exerciseData) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Exercise not found</Text>
-      </View>
+      <GameLayout>
+        <Text style={{ color: COLORS.error }}>Exercise not found</Text>
+      </GameLayout>
     );
   }
 
@@ -144,13 +128,13 @@ export default function RhymeMatchScreen() {
 
       Animated.sequence([
         Animated.timing(scaleAnims[index], {
-          toValue: 1.3,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnims[index], {
           toValue: 1.2,
           duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnims[index], {
+          toValue: 1,
+          friction: 4,
           useNativeDriver: true,
         }),
       ]).start();
@@ -177,132 +161,100 @@ export default function RhymeMatchScreen() {
           duration: 100,
           useNativeDriver: true,
         }),
-        Animated.timing(scaleAnims[index], {
-          toValue: 1.05,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnims[index], {
-          toValue: 0.9,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnims[index], {
+        Animated.spring(scaleAnims[index], {
           toValue: 1,
-          duration: 100,
+          friction: 4,
           useNativeDriver: true,
         }),
-      ]).start(() => {
-        setTimeout(() => {
-          setShowFeedback(false);
-          setSelectedChoice(null);
-        }, 1000);
-      });
+      ]).start();
+
+      setTimeout(() => {
+        setShowFeedback(false);
+        setSelectedChoice(null);
+      }, 1500);
     }
   };
 
-  const flashColor = flashAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['rgba(255, 107, 157, 0)', 'rgba(255, 107, 157, 0.3)'],
-  });
-
-  const isLandscape = width > height;
-  const cardSize = isLandscape ? Math.min(width * 0.15, 140) : 160;
-  const targetCardSize = isLandscape ? Math.min(width * 0.2, 180) : 200;
-  const emojiSize = isLandscape ? 60 : 80;
-  const targetEmojiSize = isLandscape ? 80 : 100;
-
+  // Responsive Sizing
+  const targetSize = isLandscape ? height * 0.4 : width * 0.4;
+  const choiceSize = isLandscape ? height * 0.25 : width * 0.28;
+  
   return (
-    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <Animated.View 
-        style={[
-          styles.flashOverlay,
-          { backgroundColor: flashColor }
-        ]} 
-        pointerEvents="none"
-      />
-      <View style={styles.landscapeContent}>
-        <View style={styles.leftSection}>
-          <View style={styles.header}>
-            <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 16 }]}>
-              Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
-            </Text>
-            <Text style={[styles.instructionText, { fontSize: isLandscape ? 18 : 24 }]}>
-              Which one rhymes with?
-            </Text>
-          </View>
-
-          <View style={styles.targetContainer}>
-            <View style={[
-              styles.targetCard,
-              isPlayingTarget && styles.targetCardPlaying,
-              {
-                minWidth: targetCardSize,
-                padding: isLandscape ? 20 : 30,
+    <GameLayout
+      instruction="Which one rhymes with?"
+      progress={`Exercise ${exerciseIndex + 1} of ${lesson?.exercises.length || 0}`}
+      primaryColor={COLORS.rhymeMatch.primary}
+      backgroundColor={COLORS.rhymeMatch.background}
+    >
+      <View style={[styles.mainContainer, { flexDirection: isLandscape ? 'row' : 'column' }]}>
+        
+        {/* Left: Target Word */}
+        <View style={[styles.targetSection, { flex: isLandscape ? 0.4 : 0.4 }]}>
+          <View 
+            style={[
+              styles.targetCard, 
+              { 
+                width: targetSize, 
+                height: targetSize,
+                borderColor: isPlayingTarget ? COLORS.rhymeMatch.primary : 'transparent',
+                borderWidth: isPlayingTarget ? 4 : 0,
               }
-            ]}>
-              <Text style={[styles.targetEmoji, { fontSize: targetEmojiSize }]}>{target.image}</Text>
-              <Text style={[styles.targetWord, { fontSize: isLandscape ? 28 : 36 }]}>{target.word}</Text>
-              {isPlayingTarget && (
-                <View style={styles.targetAudioIndicator}>
-                  <Volume2 size={28} color="#FF6B9D" />
-                </View>
-              )}
-            </View>
+            ]}
+          >
+            <Text style={{ fontSize: targetSize * 0.4 }}>{target.image}</Text>
+            <Text style={[styles.wordText, { fontSize: targetSize * 0.15 }]}>{target.word}</Text>
+            {isPlayingTarget && (
+              <View style={styles.audioIcon}>
+                <Volume2 size={20} color={COLORS.white} />
+              </View>
+            )}
           </View>
         </View>
 
-        <View style={styles.rightSection}>
-          <View style={styles.choicesContainer}>
+        {/* Right: Choices */}
+        <View style={[styles.choicesSection, { flex: isLandscape ? 0.6 : 0.6 }]}>
+          <View style={styles.choicesGrid}>
             {choices.map((choice, index) => {
               const isSelected = selectedChoice === index;
               const isCorrect = choice.isCorrect;
-              const showCorrect = isSelected && showFeedback && isCorrect;
-              const showIncorrect = isSelected && showFeedback && !isCorrect;
-              const isPlayingAudio = playingAudioIndex === index;
+              const isPlaying = playingAudioIndex === index;
+              
+              let borderColor = 'transparent';
+              let backgroundColor = COLORS.white;
+              
+              if (isSelected && showFeedback) {
+                borderColor = isCorrect ? COLORS.success : COLORS.error;
+                backgroundColor = isCorrect ? '#E8F5E9' : '#FFEBEE';
+              } else if (isPlaying) {
+                borderColor = COLORS.rhymeMatch.primary;
+              }
 
               return (
-                <Animated.View
-                  key={index}
-                  style={[
-                    styles.choiceWrapper,
-                    {
-                      width: cardSize,
-                      height: cardSize,
-                      transform: [{ scale: scaleAnims[index] }],
-                    },
-                  ]}
+                <Animated.View 
+                  key={index} 
+                  style={{ transform: [{ scale: scaleAnims[index] }, { scale: pulseAnims[index] }] }}
                 >
                   <TouchableOpacity
                     style={[
                       styles.choiceCard,
-                      showCorrect && styles.choiceCardCorrect,
-                      showIncorrect && styles.choiceCardIncorrect,
-                      isPlayingAudio && styles.choiceCardPlaying,
+                      {
+                        width: choiceSize,
+                        height: choiceSize,
+                        borderColor,
+                        backgroundColor,
+                      }
                     ]}
                     onPress={() => handleChoiceTap(index)}
                     disabled={showFeedback}
-                    activeOpacity={0.7}
+                    activeOpacity={0.8}
                   >
-                    <Animated.View style={{ transform: [{ scale: pulseAnims[index] }] }}>
-                      <Text style={[styles.choiceEmoji, { fontSize: emojiSize }]}>{choice.image}</Text>
-                    </Animated.View>
-                    <Text style={[styles.choiceWord, { fontSize: isLandscape ? 16 : 20 }]}>{choice.word}</Text>
-                    {isPlayingAudio && (
-                      <View style={styles.playingIndicator}>
-                        <Volume2 size={20} color="#FF6B9D" />
-                      </View>
-                    )}
-                    {showCorrect && (
-                      <View style={styles.feedbackOverlay}>
-                        <Text style={styles.feedbackEmoji}>✨</Text>
-                        <Text style={styles.feedbackText}>Great!</Text>
-                      </View>
-                    )}
-                    {showIncorrect && (
-                      <View style={styles.feedbackOverlay}>
-                        <Text style={styles.feedbackEmoji}>🤔</Text>
-                        <Text style={styles.feedbackText}>Try again!</Text>
+                    <Text style={{ fontSize: choiceSize * 0.4 }}>{choice.image}</Text>
+                    <Text style={[styles.wordText, { fontSize: choiceSize * 0.15 }]}>{choice.word}</Text>
+                    
+                    {/* Feedback Overlay */}
+                    {isSelected && showFeedback && (
+                      <View style={styles.feedbackIcon}>
+                        <Text style={{ fontSize: 24 }}>{isCorrect ? '✨' : '🤔'}</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -312,227 +264,77 @@ export default function RhymeMatchScreen() {
           </View>
         </View>
       </View>
-    </View>
+    </GameLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  mainContainer: {
     flex: 1,
-    backgroundColor: "#FFF5F7",
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  landscapeContent: {
-    flex: 1,
-    flexDirection: "row",
-    padding: 20,
+  targetSection: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
   },
-  leftSection: {
-    flex: 0.4,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingRight: 20,
-  },
-  rightSection: {
-    flex: 0.6,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  header: {
-    marginBottom: 20,
-    alignItems: "center",
-  },
-  instructionText: {
-    fontWeight: "700" as const,
-    color: "#FF6B9D",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  progressText: {
-    color: "#999",
-    fontWeight: "600" as const,
-    marginBottom: 12,
-  },
-  targetContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    flex: 1,
+  choicesSection: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
   },
   targetCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.white,
     borderRadius: 24,
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
-    borderWidth: 4,
-    borderColor: "#FF6B9D",
   },
-  targetEmoji: {
-    marginBottom: 10,
-  },
-  targetWord: {
-    fontWeight: "700" as const,
-    color: "#333",
-  },
-  choicesContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 15,
-    maxWidth: "100%",
-  },
-  choiceWrapper: {
+  choicesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: SPACING.m,
   },
   choiceCard: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
     borderRadius: 20,
-    padding: 20,
-    alignItems: "center",
-    justifyContent: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    borderWidth: 4,
-    borderColor: "transparent",
   },
-  choiceCardCorrect: {
-    borderColor: "#4CAF50",
-    backgroundColor: "#E8F5E9",
+  wordText: {
+    ...TYPOGRAPHY.h3,
+    marginTop: SPACING.xs,
+    color: COLORS.text,
   },
-  choiceCardIncorrect: {
-    borderColor: "#F44336",
-    backgroundColor: "#FFEBEE",
-  },
-  choiceEmoji: {
-    marginBottom: 8,
-  },
-  choiceWord: {
-    fontWeight: "600" as const,
-    color: "#333",
-    textAlign: "center",
-  },
-  feedbackOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    borderRadius: 16,
-  },
-  feedbackEmoji: {
-    fontSize: 48,
-    marginBottom: 4,
-  },
-  feedbackText: {
-    fontSize: 22,
-    fontWeight: "800" as const,
-    color: "#333",
-  },
-  errorText: {
-    fontSize: 18,
-    color: "#F44336",
-    textAlign: "center",
-  },
-  audioIndicator: {
-    marginTop: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: "#FFF5F7",
-  },
-  audioHint: {
-    fontSize: 16,
-    fontWeight: "600" as const,
-    color: "#FF6B9D",
-  },
-  targetCardPlaying: {
-    borderColor: "#FF6B9D",
-    borderWidth: 5,
-    backgroundColor: "#FFF5F7",
-    shadowColor: "#FF6B9D",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  targetAudioIndicator: {
-    position: "absolute",
+  audioIcon: {
+    position: 'absolute',
     top: 10,
     right: 10,
-    backgroundColor: "#FFF5F7",
-    borderRadius: 20,
-    padding: 8,
-  },
-  targetAudioText: {
-    fontSize: 18,
-    fontWeight: "700" as const,
-    color: "#FF6B9D",
-  },
-  instructionOverlay: {
-    position: "absolute",
-    bottom: 40,
-    left: 20,
-    right: 20,
-    backgroundColor: "rgba(255, 107, 157, 0.95)",
-    borderRadius: 20,
-    padding: 20,
-    alignItems: "center",
-  },
-  instructionOverlayText: {
-    fontSize: 18,
-    fontWeight: "700" as const,
-    color: "#FFFFFF",
-  },
-  playingIndicator: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    backgroundColor: "#FFF5F7",
-    borderRadius: 16,
+    backgroundColor: COLORS.rhymeMatch.primary,
     padding: 6,
-  },
-  choiceCardPlaying: {
-    borderColor: "#FF6B9D",
-    borderWidth: 4,
-    backgroundColor: "#FFF5F7",
-  },
-  loadingOverlay: {
-    position: "absolute",
-    bottom: 40,
-    left: 20,
-    right: 20,
-    backgroundColor: "rgba(255, 107, 157, 0.95)",
     borderRadius: 20,
-    padding: 20,
-    alignItems: "center",
   },
-  loadingText: {
-    fontSize: 20,
-    fontWeight: "700" as const,
-    color: "#FFFFFF",
-  },
-  flashOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
-  },
+  feedbackIcon: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  }
 });

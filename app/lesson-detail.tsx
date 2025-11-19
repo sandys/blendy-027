@@ -5,14 +5,14 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { Play, Volume2 } from "lucide-react-native";
 import { useApp } from "@/contexts/AppContext";
 import { speakText } from "@/utils/audio";
-
-
+import { COLORS, SPACING, TYPOGRAPHY, LAYOUT } from "@/constants/theme";
 
 const EXERCISE_TYPE_TO_ROUTE: Record<string, string> = {
   "Rhyme Match": "/games/rhyme-match",
@@ -29,6 +29,7 @@ export default function LessonDetailScreen() {
   const { lessons } = useApp();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
+  const { width } = useWindowDimensions();
   const lessonId = parseInt(params.id as string);
 
   const lesson = lessons.find((l) => l.lesson_number === lessonId);
@@ -53,6 +54,9 @@ export default function LessonDetailScreen() {
     }
   };
 
+  // Responsive container width
+  const containerWidth = Math.min(width, LAYOUT.maxContentWidth);
+
   return (
     <>
       <Stack.Screen
@@ -64,7 +68,12 @@ export default function LessonDetailScreen() {
       <View style={[styles.container, { paddingBottom: insets.bottom }]}>
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+              styles.scrollContent, 
+              { 
+                  paddingHorizontal: Math.max(32, (width - containerWidth) / 2 + 32),
+              }
+          ]}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
@@ -84,7 +93,7 @@ export default function LessonDetailScreen() {
                     activeOpacity={0.7}
                   >
                     <Text style={styles.graphemeText}>{grapheme}</Text>
-                    <Volume2 size={16} color="#FFFFFF" style={styles.graphemeIcon} />
+                    <Volume2 size={16} color={COLORS.white} style={styles.graphemeIcon} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -104,7 +113,7 @@ export default function LessonDetailScreen() {
                       activeOpacity={0.7}
                     >
                       <Text style={styles.wordText}>{word}</Text>
-                      <Volume2 size={14} color="#FFFFFF" style={styles.wordIcon} />
+                      <Volume2 size={14} color={COLORS.white} style={styles.wordIcon} />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -152,7 +161,7 @@ export default function LessonDetailScreen() {
                     </Text>
                   </View>
                   <View style={styles.playButton}>
-                    <Play size={24} color="#FFFFFF" fill="#FFFFFF" />
+                    <Play size={24} color={COLORS.white} fill={COLORS.white} />
                   </View>
                 </TouchableOpacity>
               );
@@ -170,7 +179,7 @@ export default function LessonDetailScreen() {
                   onPress={() => speakText(lesson.story!.text, { rate: 0.75 })}
                   activeOpacity={0.7}
                 >
-                  <Volume2 size={24} color="#4ECDC4" />
+                  <Volume2 size={24} color={COLORS.secondary} />
                   <Text style={styles.storyAudioText}>Read Story</Text>
                 </TouchableOpacity>
               </View>
@@ -185,13 +194,13 @@ export default function LessonDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F7FA",
+    backgroundColor: COLORS.background,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 32,
+    paddingVertical: 32,
   },
   header: {
     marginBottom: 36,
@@ -199,13 +208,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 36,
     fontWeight: "800" as const,
-    color: "#1A1A2E",
+    color: COLORS.text,
     marginBottom: 12,
     letterSpacing: -0.5,
   },
   description: {
     fontSize: 19,
-    color: "#6B7280",
+    color: COLORS.textLight,
     lineHeight: 28,
   },
   section: {
@@ -214,7 +223,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 24,
     fontWeight: "700" as const,
-    color: "#1A1A2E",
+    color: COLORS.text,
     marginBottom: 20,
     letterSpacing: -0.3,
   },
@@ -224,7 +233,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   graphemeChip: {
-    backgroundColor: "#4ECDC4",
+    backgroundColor: COLORS.secondary,
     paddingHorizontal: 24,
     paddingVertical: 16,
     borderRadius: 16,
@@ -237,7 +246,7 @@ const styles = StyleSheet.create({
   graphemeText: {
     fontSize: 28,
     fontWeight: "700" as const,
-    color: "#FFFFFF",
+    color: COLORS.white,
   },
   graphemeIcon: {
     marginLeft: 4,
@@ -248,7 +257,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   wordChip: {
-    backgroundColor: "#FF6B9D",
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 16,
@@ -259,13 +268,13 @@ const styles = StyleSheet.create({
   wordText: {
     fontSize: 20,
     fontWeight: "600" as const,
-    color: "#FFFFFF",
+    color: COLORS.white,
   },
   wordIcon: {
     marginLeft: 2,
   },
   exerciseCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.white,
     borderRadius: 20,
     padding: 24,
     marginBottom: 16,
@@ -285,27 +294,27 @@ const styles = StyleSheet.create({
   exerciseType: {
     fontSize: 20,
     fontWeight: "700" as const,
-    color: "#1A1A2E",
+    color: COLORS.text,
     marginBottom: 6,
   },
   exerciseSkill: {
     fontSize: 16,
-    color: "#6B7280",
+    color: COLORS.textLight,
   },
   playButton: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#4ECDC4",
+    backgroundColor: COLORS.secondary,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#4ECDC4",
+    shadowColor: COLORS.secondary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
   storyCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.white,
     borderRadius: 20,
     padding: 28,
     shadowColor: "#000",
@@ -317,7 +326,7 @@ const styles = StyleSheet.create({
   storyTitle: {
     fontSize: 24,
     fontWeight: "700" as const,
-    color: "#1A1A2E",
+    color: COLORS.text,
     marginBottom: 16,
   },
   storyText: {
@@ -327,7 +336,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 18,
-    color: "#F44336",
+    color: COLORS.error,
     textAlign: "center",
     marginTop: 40,
   },
@@ -344,6 +353,6 @@ const styles = StyleSheet.create({
   storyAudioText: {
     fontSize: 18,
     fontWeight: "600" as const,
-    color: "#4ECDC4",
+    color: COLORS.secondary,
   },
 });

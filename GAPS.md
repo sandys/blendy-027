@@ -1,24 +1,33 @@
-# Gaps Against SPEC.md & claude.md
+# Gaps & Broken Features Report
 
-## 1. Sound Search audio flow missing
-- Spec calls for each round to open with “What sound does ___ start with?”, per `SPEC.md:241-248`, and stresses multimodal cues (SPEC Part I, Multisensory Engagement).  
-- `app/games/sound-search.tsx:93-152` only speaks the completed word after a correct tap—no opening prompt, no phoneme playback per bubble, no “try again” audio.
+## 1. Critical: Sound Slide Game (Broken Physics & Interaction)
+- **Physics Loop**: Currently uses `setInterval` at 60fps. This is unreliable for React Native animation/physics. Should use `requestAnimationFrame`.
+- **Dragging Mechanics**: Uses `Body.applyForce` which creates a "floaty", laggy feel. Should use kinematic control (directly setting velocity/position) for precise drag-and-drop.
+- **Collision Detection**: User reports collisions are broken. Likely due to the floaty drag + poor tuning of collision radii vs tile sizes.
+- **Layout**: Hardcoded `wallThickness = 50` might be disproportionate on smaller landscape screens, potentially trapping bodies or causing erratic behavior.
+- **Debug**: Previous debug toggles (mentioned in legacy docs) are missing, making it hard to diagnose physics boundaries.
 
-## 2. Correct digraph animation never reaches the blank
-- Spec requires the correct bubble to float “up to fill the blank in the word” (`SPEC.md:243-247`).  
-- Implementation animates every success by a fixed `-160` / `-120` px offset (`app/games/sound-search.tsx:19-20,107-125`), so on most screen sizes it overshoots or leaves the word area altogether.
+## 2. Sound Search Game (Missing Spec Requirements)
+- **Audio Flow**: Violates SPEC.md. Missing the opening prompt "What sound does [word] start with?". It only plays audio *after* a correct guess.
+- **Animation**: While `measureLayout` is used, the user reports "broken" behavior. On Android/some layouts, `measureLayout` can return (0,0) if called too early, causing the bubble to fly to the wrong spot.
+- **Feedback**: No negative audio feedback for incorrect taps (just haptics).
 
-## 3. Sound Search layout ignores responsive rules
-- `DESIGN_GUIDELINES.md:12-42,121-140` prohibit hardcoded pixels and require layouts driven by `useWindowDimensions`.  
-- The Sound Search styles block (`app/games/sound-search.tsx:272-379`) hardcodes widths, heights, radii, and font sizes (e.g., 180 px badge, 120 px bubbles, fixed padding), causing the UI to overflow or shrink illegibly on iPads/phones—matching the “UI going out of the window” issue.
+## 3. Word Builder Game (Drop Zone Reliability)
+- **Drop Detection**: Relies on `measureInWindow` inside `onPanResponderRelease`. This is brittle. If the user scrolls or if the layout shifts (e.g. keyboard), coordinates mismatch.
+- **Touch Handling**: `PanResponder` can sometimes conflict with ScrollViews if not handled carefully (though current implementation seems to lock gestures to letters).
 
-## 4. Curriculum data lacks spec-required digraph assets
-- Section 8 mandates full sh/th/ch/ck word sets with image/audio assets (e.g., six words per digraph per Prompt 8, `SPEC.md:229-248`).  
-- `types/curriculum.ts:83-133` only models `label`/`isCorrect`, no audio/image metadata.  
-- `constants/lessons/phase3.ts:3-44` adds just one placeholder lesson (“ship” emoji), so the rest of Phase 3 can’t render or meet the decodability requirements.
+## 4. Landscape & Layout Issues (General)
+- **Hardcoded Logic**: While `isLandscape` checks exist, many "responsive" values are just magic numbers toggled between two states (e.g., `width * 0.15` vs `140`). This doesn't guarantee safety on all aspect ratios (e.g., iPad 4:3 vs iPhone 19.5:9).
+- **Text Scaling**: Font sizes are calculated via `Math.max/min` chains which can result in unreadable text on small split-screen views or unexpected large text on tablets.
 
-## 5. Sound Slide exposes debug toggles that break collisions
-- Sound Slide header ships “Show grid/Show numbers/Flex layout” buttons (`app/games/sound-slide.tsx:413-559`), violating the “header contains instructions only” rule (`DESIGN_GUIDELINES.md:51-80`).  
-- Toggling “Flex layout” disables the Matter bodies (`layoutBodies` skips `Bodies.rectangle` when `useFlexLayout` is true), so collision detection falls back to a coarse distance check, contradicting the spec’s requirement for the drag-to-collide mechanic (`SPEC.md:107,740`).  
-- Because these controls are exposed to children, they can accidentally disable physics, which matches the reported “collision detection ... absolutely broken.”
+## 5. Curriculum Data (Phase 3 & 4)
+- **Missing Assets**: `constants/lessons/phase3.ts` and `phase4.ts` are effectively empty placeholders.
+- **Incomplete Types**: `Exercise` types don't fully enforce the presence of audio/image assets required for games like Sound Search (needs `prompt` audio, `target` images).
 
+## 6. Legacy/Ghost Code
+- **GAPS.md**: The previous GAPS.md referenced "Show grid/flex layout" toggles in `sound-slide.tsx` which are no longer in the codebase. The documentation is out of sync with the code.
+
+## Action Plan Priorities
+1. **Fix Sound Slide Physics**: Rewrite to use `requestAnimationFrame` and kinematic dragging.
+2. **Fix Sound Search Audio**: Add the "What sound..." prompt logic.
+3. **Audit Layouts**: Test all games on actual iPad/iPhone simulators to verify landscape constraints.

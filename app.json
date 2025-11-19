@@ -35,9 +35,6 @@
         "RECORD_AUDIO"
       ]
     },
-    "web": {
-      "favicon": "./assets/images/favicon.png"
-    },
     "plugins": [
       [
         "expo-router",

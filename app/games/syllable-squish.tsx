@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,79 +9,53 @@ import {
   Platform,
 } from "react-native";
 import * as Haptics from "expo-haptics";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
+import { Volume2 } from "lucide-react-native";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
-import { Volume2 } from "lucide-react-native";
+import { GameLayout } from "@/components/GameLayout";
+import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
+import { SyllableSquishData } from "@/types/curriculum";
 
 export default function SyllableSquishScreen() {
-  const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
-
-  const lesson = SAMPLE_LESSONS.find((l) => l.lesson_number === lessonNumber);
-  const exercise = lesson?.exercises[exerciseIndex];
-
-  const exerciseData = exercise?.data as
-    | { word: string; image: string; syllableCount: number }
-    | undefined;
-  const word = exerciseData?.word || "";
-  const image = exerciseData?.image || "";
-  const syllableCount = exerciseData?.syllableCount || 0;
 
   const [tapCount, setTapCount] = useState<number>(0);
   const [showFeedback, setShowFeedback] = useState<boolean>(false);
   const [isCorrect, setIsCorrect] = useState<boolean>(false);
   const [isPlayingWord, setIsPlayingWord] = useState<boolean>(false);
+  
+  const buttonScale = useRef(new Animated.Value(1)).current;
+  const progressAnims = useRef<Animated.Value[]>([]).current;
   const audioLoopRef = useRef<boolean>(true);
   const isCorrectAnswerGiven = useRef<boolean>(false);
-  const flashAnim = useRef(new Animated.Value(0)).current;
 
-  const buttonScale = useMemo(() => new Animated.Value(1), []);
-  const progressAnims = useMemo(() => {
-    const anims: Animated.Value[] = [];
-    for (let i = 0; i < syllableCount; i++) {
-      anims.push(new Animated.Value(0));
-    }
-    return anims;
-  }, [syllableCount]);
+  const lesson = SAMPLE_LESSONS.find((l) => l.lesson_number === lessonNumber);
+  const exercise = lesson?.exercises[exerciseIndex];
+  const exerciseData = exercise?.data as SyllableSquishData | undefined;
+
+  if (exerciseData && progressAnims.length !== exerciseData.syllableCount) {
+    while(progressAnims.length > 0) progressAnims.pop();
+    for(let i=0; i<exerciseData.syllableCount; i++) progressAnims.push(new Animated.Value(0));
+  }
 
   useEffect(() => {
-    if (!word) return;
+    if (!exerciseData) return;
 
     audioLoopRef.current = true;
     isCorrectAnswerGiven.current = false;
-
-    const playInitialFeedback = async () => {
-      Animated.sequence([
-        Animated.timing(flashAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-        Animated.timing(flashAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-      ]).start();
-      
-      if (Platform.OS !== "web") {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 500));
-    };
+    setTapCount(0);
+    setShowFeedback(false);
 
     const playAudioLoop = async () => {
-      await playInitialFeedback();
-      
+      await new Promise(resolve => setTimeout(resolve, 500));
       while (audioLoopRef.current && !isCorrectAnswerGiven.current) {
         setIsPlayingWord(true);
-        await speakText(word, { rate: 0.8 });
+        await speakText(exerciseData.word, { rate: 0.8 });
         setIsPlayingWord(false);
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
@@ -92,13 +66,13 @@ export default function SyllableSquishScreen() {
     return () => {
       audioLoopRef.current = false;
     };
-  }, [exerciseIndex, word, flashAnim]);
+  }, [exerciseIndex, exerciseData]);
 
-  if (!exercise || exercise.exercise_type !== "Syllable Squish") {
+  if (!exerciseData) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Exercise not found</Text>
-      </View>
+      <GameLayout>
+        <Text style={{ color: COLORS.error }}>Exercise not found</Text>
+      </GameLayout>
     );
   }
 
@@ -109,350 +83,230 @@ export default function SyllableSquishScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     }
 
+    // Button Anim
     Animated.sequence([
-      Animated.timing(buttonScale, {
-        toValue: 0.85,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.spring(buttonScale, {
-        toValue: 1,
-        friction: 3,
-        tension: 40,
-        useNativeDriver: true,
-      }),
+      Animated.timing(buttonScale, { toValue: 0.9, duration: 80, useNativeDriver: true }),
+      Animated.spring(buttonScale, { toValue: 1, friction: 3, useNativeDriver: true }),
     ]).start();
 
     const newCount = tapCount + 1;
     setTapCount(newCount);
 
-    if (newCount <= syllableCount) {
-      Animated.spring(progressAnims[newCount - 1], {
-        toValue: 1,
-        friction: 5,
-        useNativeDriver: true,
-      }).start();
+    // Progress Anim
+    if (newCount <= exerciseData.syllableCount) {
+        Animated.spring(progressAnims[newCount - 1], { toValue: 1, useNativeDriver: true }).start();
     }
 
-    if (newCount === syllableCount) {
-      isCorrectAnswerGiven.current = true;
-      audioLoopRef.current = false;
-      setIsPlayingWord(false);
-      setIsCorrect(true);
-      setShowFeedback(true);
+    // Check win
+    if (newCount === exerciseData.syllableCount) {
+        isCorrectAnswerGiven.current = true;
+        audioLoopRef.current = false;
+        setIsPlayingWord(false);
+        setIsCorrect(true);
+        setShowFeedback(true);
 
-      if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-
-      setTimeout(() => {
-        const nextExerciseIndex = exerciseIndex + 1;
-        if (lesson && nextExerciseIndex < lesson.exercises.length) {
-          router.replace({
-            pathname: "/games/syllable-squish",
-            params: { lesson: lessonNumber, exercise: nextExerciseIndex },
-          });
-        } else {
-          router.back();
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
-      }, 2500);
-    } else if (newCount > syllableCount) {
-      setIsCorrect(false);
-      setShowFeedback(true);
+        
+        speakText("Great job!");
 
-      if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      }
+        setTimeout(() => {
+          const nextExerciseIndex = exerciseIndex + 1;
+          if (lesson && nextExerciseIndex < lesson.exercises.length) {
+            router.replace({
+              pathname: "/games/syllable-squish",
+              params: { lesson: lessonNumber, exercise: nextExerciseIndex },
+            });
+          } else {
+            router.back();
+          }
+        }, 2000);
 
-      setTimeout(() => {
-        setTapCount(0);
-        setShowFeedback(false);
-        progressAnims.forEach((anim) => anim.setValue(0));
-      }, 2000);
+    } else if (newCount > exerciseData.syllableCount) {
+        // Over tap!
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
+        
+        setIsCorrect(false);
+        setShowFeedback(true);
+        speakText("Too many!");
+
+        setTimeout(() => {
+            setTapCount(0);
+            setShowFeedback(false);
+            progressAnims.forEach(a => a.setValue(0));
+        }, 1500);
     }
   };
 
-  const flashColor = flashAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['rgba(255, 184, 77, 0)', 'rgba(255, 184, 77, 0.3)'],
-  });
-
-  const isLandscape = width > height;
-  const buttonSize = isLandscape ? Math.min(width * 0.15, 140) : 180;
-  const progressSize = isLandscape ? 40 : 50;
+  // Sizing
+  const buttonSize = isLandscape ? height * 0.25 : width * 0.35;
+  const cardSize = isLandscape ? height * 0.4 : width * 0.45;
 
   return (
-    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <Animated.View 
-        style={[
-          styles.flashOverlay,
-          { backgroundColor: flashColor }
-        ]} 
-        pointerEvents="none"
-      />
-      <View style={styles.landscapeContent}>
-        <View style={styles.leftSection}>
-          <View style={styles.header}>
-            <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 14 }]}>
-              Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
-            </Text>
-            <Text style={[styles.instructionText, { fontSize: isLandscape ? 18 : 26 }]}>
-              Tap the button for each syllable
-            </Text>
-          </View>
-
-          <View style={styles.wordContainer}>
+    <GameLayout
+      instruction="Squish the button for each syllable"
+      progress={`Exercise ${exerciseIndex + 1} of ${lesson?.exercises.length || 0}`}
+      primaryColor={COLORS.syllableSquish.primary}
+      backgroundColor={COLORS.syllableSquish.background}
+    >
+      <View style={[styles.container, { flexDirection: isLandscape ? 'row' : 'column' }]}>
+        
+        {/* Left: Target */}
+        <View style={[styles.targetSection, { flex: isLandscape ? 0.4 : 0.4 }]}>
             <View style={[
-              styles.wordCard,
-              isPlayingWord && styles.wordCardPlaying
-            ]}>
-              <Text style={[styles.wordEmoji, { fontSize: isLandscape ? 60 : 80 }]}>{image}</Text>
-              <Text style={[styles.wordText, { fontSize: isLandscape ? 28 : 36 }]}>{word}</Text>
-              {isPlayingWord && (
-                <View style={styles.audioIndicator}>
-                  <Volume2 size={28} color="#FFB84D" />
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.rightSection}>
-          <View style={[styles.progressBarContainer, { marginBottom: isLandscape ? 20 : 30 }]}>
-        {Array.from({ length: syllableCount }).map((_, index) => {
-          const scale = progressAnims[index]
-            ? progressAnims[index].interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.3, 1],
-              })
-            : 0.3;
-
-          const opacity = progressAnims[index]
-            ? progressAnims[index].interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.3, 1],
-              })
-            : 0.3;
-
-          return (
-            <Animated.View
-              key={index}
-              style={[
-                styles.progressSegment,
+                styles.card,
                 {
-                  width: progressSize,
-                  height: progressSize,
-                  borderRadius: progressSize / 2,
-                  transform: [{ scale }],
-                  opacity,
-                },
-              ]}
-            />
-          );
-        })}
-          </View>
-
-          <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          onPress={handleSquishTap}
-          disabled={showFeedback}
-          activeOpacity={0.9}
-        >
-          <Animated.View
-            style={[
-              styles.squishButton,
-              {
-                width: buttonSize,
-                height: buttonSize,
-                borderRadius: buttonSize / 2,
-                borderWidth: isLandscape ? 6 : 8,
-                transform: [{ scale: buttonScale }],
-              },
-            ]}
-          >
-            <Text style={[styles.squishButtonText, { fontSize: isLandscape ? 24 : 32 }]}>SQUISH!</Text>
-            <Text style={[styles.squishButtonEmoji, { fontSize: isLandscape ? 36 : 48 }]}>👆</Text>
-          </Animated.View>
-        </TouchableOpacity>
-          </View>
-
-          <View style={styles.counterContainer}>
-            <Text style={[styles.counterText, { fontSize: isLandscape ? 18 : 22 }]}>
-              Taps: {tapCount} / {syllableCount}
-            </Text>
-          </View>
-
-          {showFeedback && (
-            <View
-              style={[
-                styles.feedbackContainer,
-                isCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect,
-              ]}
-            >
-              <Text style={[styles.feedbackEmoji, { fontSize: isLandscape ? 50 : 72 }]}>
-                {isCorrect ? "🎉" : "🤔"}
-              </Text>
-              <Text style={[styles.feedbackText, { fontSize: isLandscape ? 24 : 32 }]}>
-                {isCorrect ? "Perfect!" : "Oops! Try again!"}
-              </Text>
+                    width: cardSize,
+                    minHeight: cardSize * 0.8,
+                    borderColor: isPlayingWord ? COLORS.syllableSquish.primary : 'transparent',
+                    borderWidth: isPlayingWord ? 4 : 0
+                }
+            ]}>
+                <Text style={{ fontSize: cardSize * 0.4 }}>{exerciseData.image}</Text>
+                <Text style={styles.wordText}>{exerciseData.word}</Text>
+                {isPlayingWord && <Volume2 size={24} color={COLORS.syllableSquish.primary} style={{marginTop: 10}}/>}
             </View>
-          )}
         </View>
+
+        {/* Right: Interaction */}
+        <View style={[styles.interactionSection, { flex: isLandscape ? 0.6 : 0.6 }]}>
+            
+            {/* Progress dots */}
+            <View style={styles.progressRow}>
+                {Array.from({ length: exerciseData.syllableCount }).map((_, index) => (
+                    <View 
+                      key={index} 
+                      style={[
+                          styles.progressDotBase,
+                          { width: 40, height: 40, borderRadius: 20 }
+                      ]}
+                    >
+                        <Animated.View 
+                           style={[
+                               styles.progressDotFill,
+                               { 
+                                   opacity: progressAnims[index],
+                                   transform: [{ scale: progressAnims[index] }]
+                               }
+                           ]}
+                        />
+                    </View>
+                ))}
+            </View>
+
+            {/* Squish Button */}
+            <TouchableOpacity
+              onPress={handleSquishTap}
+              activeOpacity={0.9}
+              disabled={showFeedback}
+            >
+                <Animated.View
+                  style={[
+                      styles.squishButton,
+                      {
+                          width: buttonSize,
+                          height: buttonSize,
+                          borderRadius: buttonSize / 2,
+                          transform: [{ scale: buttonScale }]
+                      }
+                  ]}
+                >
+                    <Text style={styles.squishText}>SQUISH!</Text>
+                </Animated.View>
+            </TouchableOpacity>
+            
+            <Text style={styles.counterText}>Taps: {tapCount}</Text>
+
+            {showFeedback && (
+                 <View style={[styles.feedbackBadge, { backgroundColor: isCorrect ? '#E8F5E9' : '#FFEBEE' }]}>
+                     <Text style={{ fontSize: 24, fontWeight: 'bold', color: isCorrect ? COLORS.success : COLORS.error }}>
+                         {isCorrect ? "Perfect!" : "Oops!"}
+                     </Text>
+                 </View>
+            )}
+
+        </View>
+
       </View>
-    </View>
+    </GameLayout>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFF9E6",
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  landscapeContent: {
-    flex: 1,
-    flexDirection: "row",
-    padding: 20,
+  targetSection: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  leftSection: {
-    flex: 0.4,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingRight: 20,
+  interactionSection: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: SPACING.l,
   },
-  rightSection: {
-    flex: 0.6,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  header: {
-    marginBottom: 20,
-    alignItems: "center",
-  },
-  instructionText: {
-    fontWeight: "700" as const,
-    color: "#FFB84D",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  progressText: {
-    color: "#999",
-    fontWeight: "600" as const,
-    marginBottom: 12,
-  },
-  wordContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    flex: 1,
-  },
-  wordCard: {
-    backgroundColor: "#FFFFFF",
+  card: {
+    backgroundColor: COLORS.white,
     borderRadius: 24,
-    padding: 30,
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
-    minWidth: 200,
-    borderWidth: 4,
-    borderColor: "#FFB84D",
-  },
-  wordCardPlaying: {
-    borderColor: "#FFB84D",
-    borderWidth: 5,
-    backgroundColor: "#FFF9E6",
-    shadowColor: "#FFB84D",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  audioIndicator: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    backgroundColor: "#FFF9E6",
-    borderRadius: 20,
-    padding: 8,
-  },
-  wordEmoji: {
-    marginBottom: 10,
   },
   wordText: {
-    fontWeight: "700" as const,
-    color: "#333",
+    ...TYPOGRAPHY.h2,
+    marginTop: SPACING.s,
+    color: COLORS.text,
   },
-  progressBarContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 12,
-    paddingHorizontal: 20,
+  progressRow: {
+    flexDirection: 'row',
+    gap: SPACING.m,
   },
-  progressSegment: {
-    backgroundColor: "#FFB84D",
+  progressDotBase: {
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  buttonContainer: {
-    alignItems: "center",
-    marginBottom: 20,
+  progressDotFill: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: COLORS.syllableSquish.primary,
   },
   squishButton: {
-    backgroundColor: "#FFB84D",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: COLORS.syllableSquish.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 6,
+    borderColor: COLORS.syllableSquish.accent,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
-    shadowRadius: 12,
+    shadowRadius: 8,
     elevation: 8,
-    borderColor: "#FFA726",
   },
-  squishButtonText: {
-    fontWeight: "900" as const,
-    color: "#FFFFFF",
-    marginBottom: 8,
-  },
-  squishButtonEmoji: {
-  },
-  counterContainer: {
-    alignItems: "center",
+  squishText: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: COLORS.white,
   },
   counterText: {
-    fontWeight: "700" as const,
-    color: "#666",
+    ...TYPOGRAPHY.h3,
+    color: COLORS.textLight,
   },
-  feedbackContainer: {
-    padding: 20,
-    borderRadius: 20,
-    alignItems: "center",
-    marginTop: 20,
-    minWidth: 200,
-  },
-  feedbackCorrect: {
-    backgroundColor: "#E8F5E9",
-  },
-  feedbackIncorrect: {
-    backgroundColor: "#FFEBEE",
-  },
-  feedbackEmoji: {
-    marginBottom: 12,
-  },
-  feedbackText: {
-    fontWeight: "700" as const,
-    textAlign: "center",
-    color: "#333",
-  },
-  errorText: {
-    fontSize: 18,
-    color: "#F44336",
-    textAlign: "center",
-  },
-  flashOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
-  },
+  feedbackBadge: {
+    paddingHorizontal: SPACING.l,
+    paddingVertical: SPACING.s,
+    borderRadius: 16,
+  }
 });
+

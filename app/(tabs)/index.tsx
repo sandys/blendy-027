@@ -1,22 +1,40 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { CheckCircle, Circle } from "lucide-react-native";
 import { useApp } from "@/contexts/AppContext";
 import { PHASES } from "@/constants/curriculum-data";
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const IS_LANDSCAPE = SCREEN_WIDTH > SCREEN_HEIGHT;
+import { COLORS, TYPOGRAPHY } from "@/constants/theme";
 
 export default function LessonsScreen() {
   const router = useRouter();
   const { progress, lessons } = useApp();
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+
+  // Dynamic card width based on screen size
+  // We want 2 columns on portrait (phone), 3-4 on landscape (tablet)
+  // Adjust padding calculation
+  const containerPadding = 32;
+  const gap = 20;
+  
+  const numColumns = isLandscape ? (width > 900 ? 4 : 3) : (width > 500 ? 2 : 1);
+  // Subtract padding and total gap width from total width
+  const availableWidth = width - (containerPadding * 2) - (insets.left + insets.right);
+  const cardWidth = (availableWidth - (gap * (numColumns - 1))) / numColumns;
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+      <View style={[
+          styles.header, 
+          { 
+              paddingTop: insets.top + 16,
+              paddingLeft: insets.left + 32,
+              paddingRight: insets.right + 32
+          }
+      ]}>
         <Text style={styles.title}>All Lessons</Text>
         <Text style={styles.subtitle}>
           {progress.completedLessons.length} of {lessons.length} completed
@@ -25,7 +43,14 @@ export default function LessonsScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
+        contentContainerStyle={[
+            styles.scrollContent, 
+            { 
+                paddingBottom: insets.bottom + 20,
+                paddingLeft: insets.left + 32,
+                paddingRight: insets.right + 32
+            }
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {PHASES.map((phase) => {
@@ -58,7 +83,8 @@ export default function LessonsScreen() {
                       key={lesson.lesson_number}
                       style={[
                         styles.lessonCard,
-                        isCurrent && styles.lessonCardCurrent,
+                        { width: cardWidth },
+                        isCurrent && { borderColor: COLORS.secondary, shadowColor: COLORS.secondary },
                       ]}
                       onPress={() => {
                         router.push(`/lesson-detail?id=${lesson.lesson_number}` as never);
@@ -90,7 +116,7 @@ export default function LessonsScreen() {
                         </Text>
                         <Text
                           style={styles.lessonDescription}
-                          numberOfLines={2}
+                          numberOfLines={3}
                         >
                           {lesson.description}
                         </Text>
@@ -107,17 +133,12 @@ export default function LessonsScreen() {
   );
 }
 
-const CARD_WIDTH = IS_LANDSCAPE 
-  ? Math.min((SCREEN_WIDTH - 80) / 4, 240)
-  : Math.min((SCREEN_WIDTH - 64) / 2, 280);
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F5F7FA",
   },
   header: {
-    paddingHorizontal: 32,
     paddingBottom: 20,
     backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
@@ -139,7 +160,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 32,
     paddingTop: 24,
   },
   phaseSection: {
@@ -180,8 +200,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 20,
-    width: CARD_WIDTH,
-    minHeight: 160,
+    minHeight: 180,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
@@ -190,12 +209,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "transparent",
   },
-  lessonCardCurrent: {
-    borderWidth: 2,
-    borderColor: "#4ECDC4",
-    shadowColor: "#4ECDC4",
-    shadowOpacity: 0.15,
-  },
   lessonHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -203,17 +216,23 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   lessonNumber: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: "#F3F4F6",
     alignItems: "center",
     justifyContent: "center",
   },
   lessonNumberText: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "800" as const,
     color: "#1A1A2E",
+  },
+  lessonStatus: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
   },
   lessonContent: {
     flex: 1,
@@ -229,11 +248,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6B7280",
     lineHeight: 20,
-  },
-  lessonStatus: {
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });

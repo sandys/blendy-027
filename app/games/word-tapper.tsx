@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,435 +9,353 @@ import {
   Platform,
 } from "react-native";
 import * as Haptics from "expo-haptics";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { Volume2 } from "lucide-react-native";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
 import { speakText } from "@/utils/audio";
+import { GameLayout } from "@/components/GameLayout";
+import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
+import { WordTapperData } from "@/types/curriculum";
 
 export default function WordTapperScreen() {
-  const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
   const params = useLocalSearchParams();
   const lessonNumber = parseInt(params.lesson as string);
   const exerciseIndex = parseInt(params.exercise as string);
 
-  const lesson = SAMPLE_LESSONS.find((l) => l.lesson_number === lessonNumber);
-  const exercise = lesson?.exercises[exerciseIndex];
-
-  const exerciseData = exercise?.data as
-    | { sentence: string; wordCount: number }
-    | undefined;
-  const sentence = exerciseData?.sentence || "";
-  const wordCount = exerciseData?.wordCount || 0;
-
   const [tapCount, setTapCount] = useState<number>(0);
-  const [showSubmit, setShowSubmit] = useState<boolean>(false);
   const [showFeedback, setShowFeedback] = useState<boolean>(false);
   const [isCorrect, setIsCorrect] = useState<boolean>(false);
   const [isPlayingSentence, setIsPlayingSentence] = useState<boolean>(false);
+  
+  const circleAnims = useRef<Animated.Value[]>([]).current;
   const audioLoopRef = useRef<boolean>(true);
-  const isCorrectAnswerGiven = useRef<boolean>(false);
-  const flashAnim = useRef(new Animated.Value(0)).current;
 
-  const circleAnims = useMemo(() => {
-    const anims: Animated.Value[] = [];
-    for (let i = 0; i < wordCount; i++) {
-      anims.push(new Animated.Value(0));
+  const lesson = SAMPLE_LESSONS.find((l) => l.lesson_number === lessonNumber);
+  const exercise = lesson?.exercises[exerciseIndex];
+  const exerciseData = exercise?.data as WordTapperData | undefined;
+
+  // Initialize animations array
+  if (exerciseData && circleAnims.length !== exerciseData.wordCount) {
+    // Reset/Init array if length changed
+    while(circleAnims.length > 0) circleAnims.pop();
+    for (let i = 0; i < exerciseData.wordCount; i++) {
+      circleAnims.push(new Animated.Value(1));
     }
-    return anims;
-  }, [wordCount]);
+  }
 
   useEffect(() => {
-    if (!sentence) return;
+    if (!exerciseData) return;
 
+    setTapCount(0);
+    setShowFeedback(false);
+    setIsCorrect(false);
     audioLoopRef.current = true;
-    isCorrectAnswerGiven.current = false;
 
-    const playInitialFeedback = async () => {
-      Animated.sequence([
-        Animated.timing(flashAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-        Animated.timing(flashAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-      ]).start();
-      
-      if (Platform.OS !== "web") {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      }
-      
+    const playLoop = async () => {
       await new Promise(resolve => setTimeout(resolve, 500));
-    };
-
-    const playAudioLoop = async () => {
-      await playInitialFeedback();
-      
-      while (audioLoopRef.current && !isCorrectAnswerGiven.current) {
+      while (audioLoopRef.current) {
         setIsPlayingSentence(true);
-        await speakText(sentence, { rate: 0.7 });
+        await speakText(exerciseData.sentence, { rate: 0.85 });
         setIsPlayingSentence(false);
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 2500));
+        if (isCorrect) break; // Stop loop if solved
       }
     };
 
-    playAudioLoop();
+    playLoop();
 
     return () => {
       audioLoopRef.current = false;
     };
-  }, [exerciseIndex, sentence, flashAnim]);
+  }, [exerciseIndex, exerciseData, isCorrect]); // Re-run if isCorrect changes to stop loop? Actually loop checks ref.
 
-  if (!exercise || exercise.exercise_type !== "Word Tapper") {
+  if (!exerciseData) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Exercise not found</Text>
-      </View>
+      <GameLayout>
+        <Text style={{ color: COLORS.error }}>Exercise not found</Text>
+      </GameLayout>
     );
   }
 
   const handleCircleTap = (index: number) => {
-    if (showFeedback || tapCount >= wordCount) return;
-
+    if (showFeedback || index >= exerciseData.wordCount) return;
+    
+    // Only allow tapping in order? The previous game allowed tapping any circle? 
+    // Usually Word Tapper is "tap for each word". So we just increment count.
+    // But the UI shows circles. If we tap *any* circle, does it fill *that* circle or the *next* available slot?
+    // Previous implementation: `handleCircleTap(index)` fills the circle at `index`.
+    // AND `disabled={isTapped}`.
+    // BUT `isTapped = index < tapCount`.
+    // This implies we must tap them in order implicitly? No, the previous UI rendered `wordCount` circles.
+    // `handleCircleTap(index)` set `tapCount`.
+    // Wait, previous code: `onPress={() => handleCircleTap(index)}` where `index` comes from `map`.
+    // But `isTapped` check was `index < tapCount`.
+    // So if I tap circle #3 while `tapCount` is 0, it would fire?
+    // `handleCircleTap` implementation:
+    // `const newCount = tapCount + 1; setTapCount(newCount);`
+    // It didn't use `index` for logic other than animation.
+    // So effectively, tapping *any* circle incremented the count, and the UI filled from left to right.
+    
+    // I will simplify: Just a big "TAP" button? No, the spec says "circles representing words".
+    // Usually the kid taps a physical object or a generic button.
+    // Let's keep the circles. Tapping *any* untrapped circle fills the next slot.
+    
+    // Actually, the previous UI code had `disabled={index < tapCount}`.
+    // So circle 0 is disabled if count is 1.
+    // Circle 1 is disabled if count is 2.
+    // But if I tap circle 2 when count is 0?
+    // `isTapped` for circle 2 is `2 < 0` -> false. Enabled.
+    // Tap circle 2 -> `tapCount` becomes 1.
+    // Now `index < tapCount` re-evaluates.
+    // Circle 0: `0 < 1` -> true (Filled).
+    // Circle 2: `2 < 1` -> false (Unfilled).
+    // So tapping circle 2 fills circle 0 visual? That's confusing.
+    
+    // Better UX: The circles are just indicators. We have a big "TAP" button?
+    // OR we tap the circles themselves in order?
+    // Let's enforce tapping in order, or just make them fill left-to-right regardless of which one is tapped?
+    // I'll make them act as buttons. Tapping any active one increments the count.
+    
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
 
-    Animated.spring(circleAnims[index], {
-      toValue: 1,
-      useNativeDriver: true,
-      friction: 5,
-    }).start();
-
     const newCount = tapCount + 1;
     setTapCount(newCount);
+    
+    // Animate the circle that just got "filled" (which is index `newCount - 1`)
+    Animated.sequence([
+        Animated.spring(circleAnims[newCount - 1], { toValue: 1.2, useNativeDriver: true }),
+        Animated.spring(circleAnims[newCount - 1], { toValue: 1, useNativeDriver: true })
+    ]).start();
 
-    if (newCount === wordCount) {
-      setShowSubmit(true);
+    // Auto-check if full?
+    if (newCount === exerciseData.wordCount) {
+       // Wait a moment then check? Or show "Check" button?
+       // Previous had "Check Answer" button appear.
     }
   };
 
-  const handleSubmit = () => {
-    const correct = tapCount === wordCount;
-    setIsCorrect(correct);
-    setShowFeedback(true);
-
-    if (correct) {
-      isCorrectAnswerGiven.current = true;
+  const checkAnswer = () => {
+      const correct = tapCount === exerciseData.wordCount;
+      setIsCorrect(correct);
+      setShowFeedback(true);
       audioLoopRef.current = false;
-      setIsPlayingSentence(false);
-
-      if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      if (correct) {
+          if (Platform.OS !== "web") {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+          setTimeout(() => {
+            const nextExerciseIndex = exerciseIndex + 1;
+            if (lesson && nextExerciseIndex < lesson.exercises.length) {
+              router.replace({
+                pathname: "/games/word-tapper",
+                params: { lesson: lessonNumber, exercise: nextExerciseIndex },
+              });
+            } else {
+              router.back();
+            }
+          }, 2000);
+      } else {
+          if (Platform.OS !== "web") {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          }
+          setTimeout(() => {
+              setTapCount(0);
+              setShowFeedback(false);
+          }, 1500);
       }
+  }
 
-      setTimeout(() => {
-        const nextExerciseIndex = exerciseIndex + 1;
-        if (lesson && nextExerciseIndex < lesson.exercises.length) {
-          router.replace({
-            pathname: "/games/word-tapper",
-            params: { lesson: lessonNumber, exercise: nextExerciseIndex },
-          });
-        } else {
-          router.back();
-        }
-      }, 2500);
-    } else {
-      if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      }
-
-      setTimeout(() => {
-        setTapCount(0);
-        setShowSubmit(false);
-        setShowFeedback(false);
-        circleAnims.forEach((anim) => anim.setValue(0));
-      }, 2000);
-    }
-  };
-
-  const flashColor = flashAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['rgba(78, 205, 196, 0)', 'rgba(78, 205, 196, 0.3)'],
-  });
-
-  const isLandscape = width > height;
-  const circleSize = isLandscape ? 70 : 90;
-  const sentenceCardPadding = isLandscape ? 20 : 30;
+  // Sizing
+  const circleSize = isLandscape ? height * 0.18 : width * 0.18;
 
   return (
-    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <Animated.View 
-        style={[
-          styles.flashOverlay,
-          { backgroundColor: flashColor }
-        ]} 
-        pointerEvents="none"
-      />
-      <View style={styles.landscapeContent}>
-        <View style={styles.leftSection}>
-          <View style={styles.header}>
-            <Text style={[styles.progressText, { fontSize: isLandscape ? 12 : 14 }]}>
-              Exercise {exerciseIndex + 1} of {lesson?.exercises.length || 0}
-            </Text>
-            <Text style={[styles.instructionText, { fontSize: isLandscape ? 18 : 26 }]}>
-              Tap a circle for each word you hear
-            </Text>
+    <GameLayout
+        instruction="Tap a circle for each word"
+        progress={`Exercise ${exerciseIndex + 1} of ${lesson?.exercises.length || 0}`}
+        primaryColor={COLORS.wordTapper.primary}
+        backgroundColor={COLORS.wordTapper.background}
+    >
+      <View style={[styles.container, { flexDirection: isLandscape ? 'row' : 'column' }]}>
+          
+          {/* Left: Sentence (Hidden? No, usually hidden until end? 
+             Spec says "Teacher says sentence. Student taps."
+             Text should probably be hidden or small?
+             Previous UI showed it. I'll show it but maybe obscure it? 
+             No, let's show it for now as visual support is good. 
+             Actually, for "Word Tapper", often the text is NOT shown to test auditory processing.
+             But looking at `exerciseData`, we have `sentence`.
+             I'll show it.
+          ) */}
+          <View style={[styles.sentenceSection, { flex: isLandscape ? 0.4 : 0.3 }]}>
+              <View style={[
+                  styles.card, 
+                  { 
+                      borderColor: isPlayingSentence ? COLORS.wordTapper.primary : 'transparent',
+                      borderWidth: isPlayingSentence ? 4 : 0
+                  }
+              ]}>
+                  <Volume2 size={48} color={COLORS.wordTapper.primary} />
+                  {/* We can hide text if we want to be strict, but for now show it */}
+                  <Text style={styles.sentenceText}>{exerciseData.sentence}</Text>
+              </View>
           </View>
 
-          <View style={styles.sentenceContainer}>
-            <View style={[
-              styles.sentenceCard,
-              isPlayingSentence && styles.sentenceCardPlaying,
-              { padding: sentenceCardPadding }
-            ]}>
-              <Text style={[styles.sentenceText, { fontSize: isLandscape ? 22 : 28 }]}>{sentence}</Text>
-              {isPlayingSentence && (
-                <View style={styles.audioIndicator}>
-                  <Volume2 size={28} color="#4ECDC4" />
-                </View>
-              )}
-            </View>
+          {/* Right: Circles */}
+          <View style={[styles.interactionSection, { flex: isLandscape ? 0.6 : 0.7 }]}>
+              <View style={styles.circlesRow}>
+                  {Array.from({ length: exerciseData.wordCount }).map((_, index) => {
+                      const isFilled = index < tapCount;
+                      return (
+                          <TouchableOpacity
+                            key={index}
+                            activeOpacity={0.8}
+                            onPress={() => handleCircleTap(index)}
+                            disabled={isFilled || showFeedback}
+                          >
+                              <Animated.View 
+                                style={[
+                                    styles.circle,
+                                    {
+                                        width: circleSize,
+                                        height: circleSize,
+                                        borderRadius: circleSize / 2,
+                                        backgroundColor: isFilled ? COLORS.wordTapper.primary : COLORS.white,
+                                        transform: [{ scale: circleAnims[index] || 1 }]
+                                    }
+                                ]}
+                              >
+                                  <Text style={[
+                                      styles.circleText, 
+                                      { color: isFilled ? COLORS.white : COLORS.wordTapper.primary }
+                                  ]}>
+                                      {index + 1}
+                                  </Text>
+                              </Animated.View>
+                          </TouchableOpacity>
+                      )
+                  })}
+              </View>
+
+              {/* Controls */}
+              <View style={styles.controls}>
+                  <Text style={styles.counterText}>{tapCount} / {exerciseData.wordCount}</Text>
+                  
+                  {tapCount > 0 && !showFeedback && (
+                      <TouchableOpacity 
+                        style={styles.checkButton}
+                        onPress={checkAnswer}
+                      >
+                          <Text style={styles.checkButtonText}>Check</Text>
+                      </TouchableOpacity>
+                  )}
+
+                  {showFeedback && (
+                      <View style={[styles.feedbackBadge, { backgroundColor: isCorrect ? '#E8F5E9' : '#FFEBEE' }]}>
+                          <Text style={{ fontSize: 24, fontWeight: 'bold', color: isCorrect ? COLORS.success : COLORS.error }}>
+                              {isCorrect ? "Correct!" : "Try Again"}
+                          </Text>
+                      </View>
+                  )}
+              </View>
           </View>
-        </View>
 
-        <View style={styles.rightSection}>
-          <View style={styles.circlesContainer}>
-        {Array.from({ length: wordCount }).map((_, index) => {
-          const isTapped = index < tapCount;
-          const scale = circleAnims[index]
-            ? circleAnims[index].interpolate({
-                inputRange: [0, 1],
-                outputRange: [1, 1.2],
-              })
-            : 1;
-
-          return (
-            <TouchableOpacity
-              key={index}
-              onPress={() => handleCircleTap(index)}
-              disabled={isTapped || showFeedback}
-              activeOpacity={0.7}
-            >
-              <Animated.View
-                style={[
-                  styles.circle,
-                  isTapped && styles.circleFilled,
-                  {
-                    width: circleSize,
-                    height: circleSize,
-                    borderRadius: circleSize / 2,
-                    transform: [{ scale }],
-                  },
-                ]}
-              >
-                {isTapped && <Text style={[styles.circleNumber, { fontSize: circleSize * 0.4 }]}>{index + 1}</Text>}
-              </Animated.View>
-            </TouchableOpacity>
-          );
-        })}
-          </View>
-
-          <View style={styles.counterContainer}>
-            <Text style={[styles.counterText, { fontSize: isLandscape ? 16 : 20 }]}>
-              Words tapped: {tapCount} / {wordCount}
-            </Text>
-          </View>
-
-          {showSubmit && !showFeedback && (
-            <TouchableOpacity 
-              style={[
-                styles.submitButton,
-                {
-                  paddingVertical: isLandscape ? 12 : 16,
-                  paddingHorizontal: isLandscape ? 30 : 40,
-                }
-              ]} 
-              onPress={handleSubmit}
-            >
-              <Text style={[styles.submitButtonText, { fontSize: isLandscape ? 16 : 20 }]}>Check Answer</Text>
-            </TouchableOpacity>
-          )}
-
-          {showFeedback && (
-            <View
-              style={[
-                styles.feedbackContainer,
-                isCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect,
-              ]}
-            >
-              <Text style={[styles.feedbackEmoji, { fontSize: isLandscape ? 50 : 72 }]}>
-                {isCorrect ? "🎉" : "🤔"}
-              </Text>
-              <Text style={[styles.feedbackText, { fontSize: isLandscape ? 24 : 32 }]}>
-                {isCorrect ? "Perfect!" : "Try again!"}
-              </Text>
-            </View>
-          )}
-        </View>
       </View>
-    </View>
+    </GameLayout>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F0F8FF",
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  landscapeContent: {
-    flex: 1,
-    flexDirection: "row",
-    padding: 20,
+  sentenceSection: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.m,
   },
-  leftSection: {
-    flex: 0.4,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingRight: 20,
+  interactionSection: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  rightSection: {
-    flex: 0.6,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  header: {
-    marginBottom: 20,
-    alignItems: "center",
-  },
-  instructionText: {
-    fontWeight: "700" as const,
-    color: "#4ECDC4",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  progressText: {
-    color: "#999",
-    fontWeight: "600" as const,
-    marginBottom: 12,
-  },
-  sentenceContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    flex: 1,
-  },
-  sentenceCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    padding: SPACING.l,
+    alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
     minWidth: 200,
-    borderWidth: 4,
-    borderColor: "#4ECDC4",
-  },
-  sentenceCardPlaying: {
-    borderColor: "#4ECDC4",
-    borderWidth: 5,
-    backgroundColor: "#E8F9F8",
-    shadowColor: "#4ECDC4",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
   },
   sentenceText: {
-    fontWeight: "700" as const,
-    color: "#333",
-    textAlign: "center",
+    ...TYPOGRAPHY.h2,
+    textAlign: 'center',
+    marginTop: SPACING.m,
+    color: COLORS.text,
   },
-  audioIndicator: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    backgroundColor: "#E8F9F8",
-    borderRadius: 20,
-    padding: 8,
-  },
-  circlesContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    flexWrap: "wrap",
-    gap: 15,
-    marginBottom: 20,
-    maxWidth: "100%",
+  circlesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: SPACING.m,
+    marginBottom: SPACING.l,
   },
   circle: {
     borderWidth: 4,
-    borderColor: "#4ECDC4",
-    backgroundColor: "#FFFFFF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  circleFilled: {
-    backgroundColor: "#4ECDC4",
-  },
-  circleNumber: {
-    fontWeight: "700" as const,
-    color: "#FFFFFF",
-  },
-  counterContainer: {
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  counterText: {
-    fontWeight: "600" as const,
-    color: "#666",
-  },
-  submitButton: {
-    backgroundColor: "#4ECDC4",
-    borderRadius: 30,
-    alignSelf: "center",
+    borderColor: COLORS.wordTapper.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 4,
   },
-  submitButtonText: {
-    fontWeight: "700" as const,
-    color: "#FFFFFF",
+  circleText: {
+    fontSize: 24,
+    fontWeight: 'bold',
   },
-  feedbackContainer: {
-    padding: 20,
-    borderRadius: 20,
-    alignSelf: "center",
-    marginTop: 20,
-    alignItems: "center",
-    minWidth: 200,
+  controls: {
+    alignItems: 'center',
+    gap: SPACING.m,
+    minHeight: 80,
   },
-  feedbackCorrect: {
-    backgroundColor: "#E8F5E9",
+  counterText: {
+    ...TYPOGRAPHY.h3,
+    color: COLORS.textLight,
   },
-  feedbackIncorrect: {
-    backgroundColor: "#FFEBEE",
+  checkButton: {
+    backgroundColor: COLORS.wordTapper.primary,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.m,
+    borderRadius: 30,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  feedbackEmoji: {
-    marginBottom: 12,
+  checkButtonText: {
+    color: COLORS.white,
+    fontSize: 20,
+    fontWeight: 'bold',
   },
-  feedbackText: {
-    fontWeight: "700" as const,
-    textAlign: "center",
-    color: "#333",
-  },
-  errorText: {
-    fontSize: 18,
-    color: "#F44336",
-    textAlign: "center",
-  },
-  flashOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
-  },
+  feedbackBadge: {
+    paddingHorizontal: SPACING.l,
+    paddingVertical: SPACING.s,
+    borderRadius: 16,
+  }
 });
