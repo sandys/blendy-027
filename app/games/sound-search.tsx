@@ -114,9 +114,9 @@ export default function SoundSearchScreen() {
           setTimeout(() => {
             const nextExerciseIndex = exerciseIndex + 1;
             if (lesson && nextExerciseIndex < lesson.exercises.length) {
-              router.replace({
-                pathname: "/games/sound-search",
-                params: { lesson: lessonNumber, exercise: nextExerciseIndex },
+              router.setParams({
+                lesson: lessonNumber,
+                exercise: nextExerciseIndex,
               });
             } else {
               router.back();

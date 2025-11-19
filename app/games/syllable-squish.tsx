@@ -114,9 +114,9 @@ export default function SyllableSquishScreen() {
         setTimeout(() => {
           const nextExerciseIndex = exerciseIndex + 1;
           if (lesson && nextExerciseIndex < lesson.exercises.length) {
-            router.replace({
-              pathname: "/games/syllable-squish",
-              params: { lesson: lessonNumber, exercise: nextExerciseIndex },
+            router.setParams({
+              lesson: lessonNumber,
+              exercise: nextExerciseIndex,
             });
           } else {
             router.back();

@@ -101,9 +101,9 @@ export default function SoundDetectiveScreen() {
       setTimeout(() => {
         const nextExerciseIndex = exerciseIndex + 1;
         if (lesson && nextExerciseIndex < lesson.exercises.length) {
-          router.replace({
-            pathname: "/games/sound-detective",
-            params: { lesson: lessonNumber, exercise: nextExerciseIndex },
+          router.setParams({
+            lesson: lessonNumber,
+            exercise: nextExerciseIndex,
           });
         } else {
           router.back();
