@@ -1,5 +1,6 @@
 # **A Systematic Phonics Curriculum for an Interactive Children's Reading Application**
 
+C
 ## **Part I: Foundational Principles and Curriculum Overview**
 
 ### **Section 1: Pedagogical Framework**
