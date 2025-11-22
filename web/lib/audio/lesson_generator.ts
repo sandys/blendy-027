@@ -114,8 +114,7 @@ export async function generateWordAudio(
     // Instead of manual crossfading, we ask Piper to generate the whole word very slowly.
     // This ensures natural co-articulation (blending) between phonemes.
     console.log(`[Gen] Generating Smooth Blend (Native Piper)...`);
-    // Scale 5.0 = ~5x slower than normal. Adjust as needed for "5 seconds".
-    // If normal is ~0.8s, 5.0 -> 4.0s.
+    // Scale 5.0 = ~5x slower with reduced noise params for smoother output
     const smoothBlend = await generateAudio(text, 5.0);
 
     /* Legacy DSP Blend (Disabled)
