@@ -7,7 +7,9 @@ interface LessonRequest {
     words: Array<{ 
         id: string, 
         text: string, 
-        ace_phonemes: string[], 
+        onset?: string,
+        rime?: string,
+        ace_phonemes?: string[], 
         onset_ace?: string[], 
         rime_ace?: string[] 
     }>;
@@ -117,11 +119,20 @@ export async function generateWordAudio(
     }
     const segmentedBlend = concat(segmentedParts);
 
-    // B. Smooth Blend (Crossfade)
+    // B. Smooth Blend (Native Piper Stretch)
+    // Instead of manual crossfading, we ask Piper to generate the whole word very slowly.
+    // This ensures natural co-articulation (blending) between phonemes.
+    console.log(`[Gen] Generating Smooth Blend (Native Piper)...`);
+    // Scale 5.0 = ~5x slower than normal. Adjust as needed for "5 seconds".
+    // If normal is ~0.8s, 5.0 -> 4.0s.
+    const smoothBlend = await generateAudio(phonemeString, 5.0);
+
+    /* Legacy DSP Blend (Disabled)
     let smoothBlend = stretchedPhonemes[0];
     for (let i = 1; i < stretchedPhonemes.length; i++) {
-        smoothBlend = crossfade(smoothBlend, stretchedPhonemes[i], 250); // Aggressive overlap
+        smoothBlend = crossfade(smoothBlend, stretchedPhonemes[i], 250); 
     }
+    */
 
     // 5. Isolated Onset/Rime Clips
     let onsetPCM = null;

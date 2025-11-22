@@ -3,20 +3,29 @@ import { generateWordAudio } from '@/lib/audio/lesson_generator';
 
 export const dynamic = 'force-dynamic';
 
+import { wordToAce } from '@/lib/audio/g2p';
+
 export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
     const text = searchParams.get('text');
-    // Accept 'ace' OR 'phonemes' (legacy/fallback)
-    const ace = (searchParams.get('ace') || searchParams.get('phonemes'))?.split(',');
-    const onset = searchParams.get('onset')?.split(',');
-    const rime = searchParams.get('rime')?.split(',');
+    
+    // ACE phoneme arrays (comma-separated)
+    let ace = searchParams.get('ace')?.split(',').filter(p => p.length > 0);
+    let onsetAce = searchParams.get('onset')?.split(',').filter(p => p.length > 0);
+    let rimeAce = searchParams.get('rime')?.split(',').filter(p => p.length > 0);
 
-    if (!text || !ace) {
-        return NextResponse.json({ error: 'Missing params' }, { status: 400 });
+    if (!text) {
+        return NextResponse.json({ error: 'Missing text' }, { status: 400 });
     }
 
+    // Auto-generate ACE if missing
+    if (!ace) {
+        ace = wordToAce(text);
+    }
+    // onset and rime are already ACE phonemes from the lesson API, no conversion needed
+
     try {
-        const audioData = await generateWordAudio(text, ace, onset, rime);
+        const audioData = await generateWordAudio(text, ace, onsetAce, rimeAce);
         
         return NextResponse.json(audioData, {
             headers: {
