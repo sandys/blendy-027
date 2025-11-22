@@ -8,28 +8,27 @@ import { wordToAce } from '@/lib/audio/g2p';
 export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
     const text = searchParams.get('text');
-    
-    // ACE phoneme arrays (comma-separated)
+    const onsetText = searchParams.get('onset_text');
+    const rimeText = searchParams.get('rime_text');
+
+    // ACE phoneme arrays (comma-separated) - only used for duration calculation
     let ace = searchParams.get('ace')?.split(',').filter(p => p.length > 0);
-    let onsetAce = searchParams.get('onset')?.split(',').filter(p => p.length > 0);
-    let rimeAce = searchParams.get('rime')?.split(',').filter(p => p.length > 0);
 
     if (!text) {
         return NextResponse.json({ error: 'Missing text' }, { status: 400 });
     }
 
-    // Auto-generate ACE if missing
+    // Auto-generate ACE if missing (for duration calculation)
     if (!ace) {
         ace = wordToAce(text);
     }
-    // onset and rime are already ACE phonemes from the lesson API, no conversion needed
 
     try {
-        const audioData = await generateWordAudio(text, ace, onsetAce, rimeAce);
+        const audioData = await generateWordAudio(text, ace, onsetText, rimeText);
         
         return NextResponse.json(audioData, {
             headers: {
-                'Cache-Control': 'public, max-age=31536000, immutable'
+                'Cache-Control': 'no-store, max-age=0'
             }
         });
     } catch (e) {

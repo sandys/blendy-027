@@ -44,38 +44,29 @@ function encodeBase64(pcm: PCM): string {
 // Helper to make isolated consonants pronounceable (add schwa)
 function getSpeakableIPA(ipa: string): string {
     // Vowels don't need change
-    if ('aeiouæɑɔəɛɪʊʌ'.includes(ipa.charAt(0))) return ipa;
-    
+    const vowels = ['a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U', '@', 'ə'];
+    if (vowels.includes(ipa.charAt(0))) return ipa;
+
     // If it's already long/complex, leave it
     if (ipa.length > 2) return ipa;
 
-    // Only add schwa to STOPS. Continuants (m, s, f, etc) can be stretched naturally.
-    // Also adding 'h' because [[h]] often defaults to "aitch"
-    const stops = ['b', 'd', 'g', 'p', 't', 'k', 'h'];
-    if (stops.includes(ipa)) {
-        return ipa + 'ə';
-    }
-
-    // Leave continuants (m, n, s, f, v, z, sh, th, etc) alone so they "hum"
-    // e.g. [[m̩]] -> "mmm"
-    return ipa;
+    // Add IPA schwa ə to single consonants to prevent letter-name pronunciation
+    // Without this, "f" becomes "eff", "s" becomes "ess", etc.
+    return ipa + 'ə';
 }
 
 export async function generateWordAudio(
-    text: string, 
-    ace_phonemes: string[], 
-    onset_ace?: string[], 
-    rime_ace?: string[]
+    text: string,
+    ace_phonemes: string[],
+    onset_text?: string | null,
+    rime_text?: string | null
 ) {
-    // Strict Phoneme Mode: Convert ACE -> IPA
-    // For WHOLE WORD, we do NOT add schwa. We want pure blending.
-    const wordIPA = ace_phonemes.map(toIPA).join('');
-    const phonemeString = `[[${wordIPA}]]`;
-    console.log(`[Gen] Whole Word IPA Input: "${phonemeString}"`);
+    // Use plain text mode - let Piper's espeak-ng phonemizer handle it
+    console.log(`[Gen] Whole Word Text Input: "${text}"`);
 
-    // 1. Base Audio (Whole Words via Phonemes)
-    const normalPCM = await generateAudio(phonemeString, 1.0);
-    const slowPCM = await generateAudio(phonemeString, 0.65);
+    // 1. Base Audio (Whole Words via plain text)
+    const normalPCM = await generateAudio(text, 1.0);
+    const slowPCM = await generateAudio(text, 0.65);
 
     // 2. Compute Durations
     const weights = ace_phonemes.map(getWeight);
@@ -125,7 +116,7 @@ export async function generateWordAudio(
     console.log(`[Gen] Generating Smooth Blend (Native Piper)...`);
     // Scale 5.0 = ~5x slower than normal. Adjust as needed for "5 seconds".
     // If normal is ~0.8s, 5.0 -> 4.0s.
-    const smoothBlend = await generateAudio(phonemeString, 5.0);
+    const smoothBlend = await generateAudio(text, 5.0);
 
     /* Legacy DSP Blend (Disabled)
     let smoothBlend = stretchedPhonemes[0];
@@ -134,19 +125,17 @@ export async function generateWordAudio(
     }
     */
 
-    // 5. Isolated Onset/Rime Clips
+    // 5. Isolated Onset/Rime Clips (using plain text)
     let onsetPCM = null;
-    if (onset_ace && onset_ace.length > 0) {
-        console.log(`[Gen] Generating Onset...`);
-        const onsetIPA = onset_ace.map(toIPA).join('');
-        onsetPCM = await generateAudio(`[[${onsetIPA}]]`, 0.7);
+    if (onset_text) {
+        console.log(`[Gen] Generating Onset from text: "${onset_text}"`);
+        onsetPCM = await generateAudio(onset_text, 0.7);
     }
 
     let rimePCM = null;
-    if (rime_ace && rime_ace.length > 0) {
-        console.log(`[Gen] Generating Rime...`);
-        const rimeIPA = rime_ace.map(toIPA).join('');
-        rimePCM = await generateAudio(`[[${rimeIPA}]]`, 1.0); 
+    if (rime_text) {
+        console.log(`[Gen] Generating Rime from text: "${rime_text}"`);
+        rimePCM = await generateAudio(rime_text, 1.0);
     }
 
     console.log(`[Gen-End] Finished.`);
@@ -166,12 +155,12 @@ export function getLessonStructure(req: LessonRequest) {
     const responseWords = req.words.map(word => {
         const params = new URLSearchParams();
         params.set('text', word.text);
+        if (word.onset) params.set('onset_text', word.onset);
+        if (word.rime) params.set('rime_text', word.rime);
         if (word.ace_phonemes) params.set('ace', word.ace_phonemes.join(','));
-        if (word.onset_ace) params.set('onset', word.onset_ace.join(','));
-        if (word.rime_ace) params.set('rime', word.rime_ace.join(','));
         // Cache Busting
         params.set('t', Date.now().toString());
-        params.set('v', '3');
+        params.set('v', '4');
 
         return {
             id: word.id,

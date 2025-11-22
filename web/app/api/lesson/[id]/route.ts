@@ -31,6 +31,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
                     words.push({
                         id: word,
                         text: word,
+                        onset: onset,
+                        rime: rime,
                         ace_phonemes: wordAce,
                         onset_ace: onsetAce,
                         rime_ace: rimeAce
