@@ -11,7 +11,7 @@ import {
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, router } from "expo-router";
 import { SAMPLE_LESSONS } from "@/constants/curriculum-data";
-import { speakText, stopSpeaking } from "@/utils/audio";
+import { speakText, stopSpeaking, getStretchedWord, textToPhoneme } from "@/utils/audio";
 import { GameLayout } from "@/components/GameLayout";
 import { COLORS, SPACING } from "@/constants/theme";
 import { SoundSlideData } from "@/types/curriculum";
@@ -57,13 +57,14 @@ export default function SoundSlideScreen() {
           await new Promise(resolve => setTimeout(resolve, 500));
           // Rely on audioLoopRef for loop control, not stage state dependency
           while (audioLoopRef.current) {
-              console.log("[SoundSlide] Audio loop: Onset");
-              await speakText(exerciseData.onset, { usePhoneme: true });
-              await new Promise(resolve => setTimeout(resolve, 1000));
+              console.log("[SoundSlide] Audio loop: Phonetic Phrase");
+              // Play "kuh at" as a single utterance to minimize gaps
+              // We avoid "aaaaa" to prevent spelling-out behavior
+              const phrase = textToPhoneme(exerciseData.onset) + " " + exerciseData.rime;
+              
+              await speakText(phrase, { rate: 0.4, usePhoneme: false });
+              
               if (!audioLoopRef.current) break;
-  
-              console.log("[SoundSlide] Audio loop: Rime");
-              await speakText(exerciseData.rime, { usePhoneme: false });
               await new Promise(resolve => setTimeout(resolve, 2500));
           }
       };
