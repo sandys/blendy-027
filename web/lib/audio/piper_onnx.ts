@@ -97,11 +97,13 @@ export async function generateAudioONNX(
 
     console.log(`[Piper ONNX] Generated ${audioData.length} audio samples`);
 
-    // Convert float32 PCM to int16 PCM
+    // Convert float32 PCM to int16 PCM with volume boost
+    const volumeBoost = 2.0; // Boost volume by 2x
     const int16Data = new Int16Array(audioData.length);
     for (let i = 0; i < audioData.length; i++) {
-      // Clamp to [-1, 1] and convert to int16 range
-      const clampedValue = Math.max(-1, Math.min(1, audioData[i]));
+      // Apply volume boost and clamp to [-1, 1], then convert to int16 range
+      const boostedValue = audioData[i] * volumeBoost;
+      const clampedValue = Math.max(-1, Math.min(1, boostedValue));
       int16Data[i] = Math.round(clampedValue * 32767);
     }
 

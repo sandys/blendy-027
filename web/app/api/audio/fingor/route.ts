@@ -61,6 +61,13 @@ export async function GET(req: NextRequest) {
                 console.log(`[Fingor] Added schwa for consonant: "${phonemeString}" -> "${phonemeForAudio}"`);
             }
 
+            // For isolated vowels, repeat them to make them longer and more audible
+            // This is especially important for short vowels like ɪ
+            if (hasVowel && phonemeString.length === 1) {
+                phonemeForAudio = phonemeString + phonemeString;
+                console.log(`[Fingor] Doubled vowel for emphasis: "${phonemeString}" -> "${phonemeForAudio}"`);
+            }
+
             // Generate audio using ONNX Runtime with IPA phonemes
             // Use slower speed (higher length_scale) for clearer pronunciation
             const pcm = await generateAudioONNX(phonemeForAudio, 2.0);
