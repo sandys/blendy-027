@@ -71,7 +71,7 @@ const G2P_ENG: Record<string, string[]> = {
   "ur": ["er"],      // fur
 };
 
-function wordToGraphemes(word: string): string[] {
+export function wordToGraphemes(word: string): string[] {
   const lower = word.toLowerCase();
   const graphemes: string[] = [];
   let i = 0;

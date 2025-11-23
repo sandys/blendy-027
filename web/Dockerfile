@@ -1,7 +1,7 @@
 FROM node:20-bullseye
 
-# Install utilities
-RUN apt-get update && apt-get install -y curl tar bzip2 && rm -rf /var/lib/apt/lists/*
+# Install utilities and espeak-ng for phonemization
+RUN apt-get update && apt-get install -y curl tar bzip2 espeak-ng && rm -rf /var/lib/apt/lists/*
 
 # Setup Piper
 WORKDIR /tmp

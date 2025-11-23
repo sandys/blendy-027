@@ -128,7 +128,28 @@ export async function generateWordAudio(
     let onsetPCM = null;
     if (onset_text) {
         console.log(`[Gen] Generating Onset from text: "${onset_text}"`);
-        onsetPCM = await generateAudio(onset_text, 0.7);
+
+        // Make consonants pronounceable by doubling them or adding vowel
+        // e.g., "m" -> "mmm" (continuant) or "b" -> "buh" (stop)
+        let onsetForTTS = onset_text;
+        const vowels = ['a', 'e', 'i', 'o', 'u'];
+        const hasVowel = vowels.some(v => onset_text.includes(v));
+
+        if (!hasVowel && onset_text.length === 1) {
+            // For continuants (m, n, s, f, etc), triple the letter for a sustained sound
+            const continuants = ['m', 'n', 's', 'f', 'v', 'z', 'l', 'r'];
+            if (continuants.includes(onset_text)) {
+                onsetForTTS = onset_text + onset_text + onset_text; // e.g., "m" -> "mmm"
+            } else {
+                onsetForTTS = onset_text + 'uh'; // e.g., "b" -> "buh"
+            }
+            console.log(`[Gen] Modified onset "${onset_text}" -> "${onsetForTTS}" for TTS`);
+        } else if (!hasVowel && onset_text.length === 2) {
+            onsetForTTS = onset_text + 'uh'; // e.g., "sh" -> "shuh"
+            console.log(`[Gen] Modified onset "${onset_text}" -> "${onsetForTTS}" for TTS`);
+        }
+
+        onsetPCM = await generateAudio(onsetForTTS, 0.7);
     }
 
     let rimePCM = null;
