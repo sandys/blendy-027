@@ -17,10 +17,10 @@ export async function generateAudio(text: string, lengthScale: number = 1.0): Pr
 
         const piper = spawn(PIPER_BIN, [
             '--model', MODEL_PATH,
-            '--output_file', '-',
-            '--length_scale', lengthScale.toString(),
-            '--noise_scale', '0.333',  // Lower noise = more stable/smoother (default 0.667)
-            '--noise_w', '0.333'       // Lower noise_w = less variation (default 0.8)
+            '--output-file', '-',
+            '--length-scale', lengthScale.toString(),
+            '--noise-scale', '0.333',  // Lower noise = more stable/smoother (default 0.667)
+            '--noise-w-scale', '0.333'       // Lower noise_w = less variation (default 0.8)
         ]);
 
         const chunks: Buffer[] = [];

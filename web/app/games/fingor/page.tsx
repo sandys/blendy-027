@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { SAMPLE_LESSONS } from '@/lib/data/curriculum';
 
 interface AudioSegment {
   grapheme: string;
@@ -8,30 +10,49 @@ interface AudioSegment {
 }
 
 export default function FingorGame() {
-  const [word, setWord] = useState('mat');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const lessonNumber = parseInt(searchParams.get('lesson') || '4');
+  const exerciseIndex = parseInt(searchParams.get('exercise') || '0');
+
+  const lesson = SAMPLE_LESSONS.find((l) => l.lesson_number === lessonNumber);
+  const exercise = lesson?.exercises[exerciseIndex];
+  const exerciseData = exercise?.data as any;
+  const word = exerciseData?.word || 'mat';
+
   const [segments, setSegments] = useState<AudioSegment[]>([]);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [started, setStarted] = useState(false);
+  const [audioReady, setAudioReady] = useState(false);
   const audioRefs = useRef<HTMLAudioElement[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
 
-  // Fetch audio segments
+  // Fetch audio segments when word changes
   useEffect(() => {
     async function loadAudio() {
       setIsLoading(true);
+      setAudioReady(false);
+      setStarted(false); // Reset started state for new exercise
       try {
         const res = await fetch(`/api/audio/fingor?text=${word}`);
         const data = await res.json();
         setSegments(data.segments);
 
-        // Preload audio elements
-        audioRefs.current = data.segments.map((seg: AudioSegment) => {
-          const audio = new Audio(seg.audio_url);
-          audio.loop = true;
-          audio.preload = 'auto';
-          return audio;
+        // Preload audio elements and wait for them to be ready
+        const audioPromises = data.segments.map((seg: AudioSegment) => {
+          return new Promise<HTMLAudioElement>((resolve) => {
+            const audio = new Audio(seg.audio_url);
+            audio.loop = true;
+            audio.preload = 'auto';
+            audio.addEventListener('canplaythrough', () => resolve(audio), { once: true });
+            audio.load();
+          });
         });
+
+        audioRefs.current = await Promise.all(audioPromises);
+        setAudioReady(true);
       } catch (err) {
         console.error('Failed to load audio:', err);
       } finally {
@@ -55,8 +76,10 @@ export default function FingorGame() {
   }, [activeIndex]);
 
   // Handle pointer events
-  const handlePointerDown = () => {
+  const handlePointerDown = (index: number) => {
+    if (!started) return;
     isDraggingRef.current = true;
+    setActiveIndex(index); // Set active immediately on pointer down
   };
 
   const handlePointerUp = () => {
@@ -83,6 +106,43 @@ export default function FingorGame() {
       setActiveIndex(index);
     }
   };
+
+  const handleNext = () => {
+    const nextExerciseIndex = exerciseIndex + 1;
+    if (lesson && nextExerciseIndex < lesson.exercises.length) {
+      // Navigate to next exercise
+      router.push(`/games/fingor?lesson=${lessonNumber}&exercise=${nextExerciseIndex}`);
+    } else {
+      // Go back to lesson selection or previous page
+      router.back();
+    }
+  };
+
+  // Pre-start State (Tap to Start modal)
+  if (!started) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-blue-50 to-blue-100">
+        <div
+          className="absolute inset-0 bg-black/40 flex items-center justify-center z-50 cursor-pointer backdrop-blur-sm"
+          onClick={() => audioReady && setStarted(true)}
+        >
+          <div className="bg-white px-12 py-8 rounded-3xl shadow-2xl flex flex-col items-center animate-pulse transition-transform hover:scale-105">
+            {!audioReady ? (
+              <>
+                <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <div className="text-2xl font-bold text-gray-800">Loading Audio...</div>
+              </>
+            ) : (
+              <>
+                <div className="text-6xl mb-4">▶️</div>
+                <div className="text-2xl font-bold text-gray-800">Tap to Start</div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -114,7 +174,7 @@ export default function FingorGame() {
               key={index}
               data-segment-index={index}
               className="flex flex-col items-center cursor-pointer"
-              onPointerDown={handlePointerDown}
+              onPointerDown={() => handlePointerDown(index)}
               onPointerEnter={() => handleSegmentEnter(index)}
             >
               {/* Grapheme Box */}
@@ -160,15 +220,14 @@ export default function FingorGame() {
         </p>
       </div>
 
-      {/* Dev Controls */}
-      <div className="fixed bottom-4 right-4 flex gap-2">
-        <input
-          type="text"
-          value={word}
-          onChange={(e) => setWord(e.target.value.toLowerCase())}
-          className="px-4 py-2 border-2 border-gray-300 rounded-lg"
-          placeholder="Enter word"
-        />
+      {/* Next Button */}
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2">
+        <button
+          onClick={handleNext}
+          className="bg-blue-500 hover:bg-blue-600 text-white font-bold text-2xl px-12 py-4 rounded-full shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
+        >
+          Next
+        </button>
       </div>
     </div>
   );
