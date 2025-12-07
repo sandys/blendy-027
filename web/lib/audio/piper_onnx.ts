@@ -22,7 +22,7 @@ interface VoiceConfig {
 let voiceConfig: VoiceConfig | null = null;
 let ortSession: ort.InferenceSession | null = null;
 
-async function loadModel() {
+async function loadModel(): Promise<{ voiceConfig: VoiceConfig; ortSession: ort.InferenceSession }> {
   if (!voiceConfig) {
     const configData = fs.readFileSync(CONFIG_PATH, 'utf-8');
     voiceConfig = JSON.parse(configData);
@@ -30,7 +30,7 @@ async function loadModel() {
   if (!ortSession) {
     ortSession = await ort.InferenceSession.create(MODEL_PATH);
   }
-  return { voiceConfig, ortSession };
+  return { voiceConfig: voiceConfig!, ortSession: ortSession! };
 }
 
 /**
@@ -61,20 +61,40 @@ function phonemesToIds(phonemes: string, config: VoiceConfig): number[] {
 }
 
 /**
+ * Custom error class for TTS generation failures
+ */
+export class TTSGenerationError extends Error {
+  constructor(message: string, public readonly cause?: unknown) {
+    super(message);
+    this.name = 'TTSGenerationError';
+  }
+}
+
+/**
  * Generate audio from IPA phonemes using ONNX Runtime
+ * @throws {TTSGenerationError} if generation fails
  */
 export async function generateAudioONNX(
   phonemes: string,
   lengthScale: number = 1.0
 ): Promise<PCM> {
+  if (!phonemes || phonemes.trim().length === 0) {
+    console.warn('[Piper ONNX] Empty phonemes input, returning silence');
+    return { samples: new Int16Array(16000), sampleRate: 16000 };
+  }
+
   try {
     const { voiceConfig, ortSession } = await loadModel();
 
-    console.log(`[Piper ONNX] Generating audio for phonemes: "${phonemes}"`);
+    console.log(`[Piper ONNX] Generating audio for phonemes: "${phonemes}" (scale: ${lengthScale})`);
 
     // Convert phonemes to IDs
     const phonemeIds = phonemesToIds(phonemes, voiceConfig);
-    console.log(`[Piper ONNX] Phoneme IDs:`, phonemeIds);
+
+    if (phonemeIds.length < 3) {
+      console.warn('[Piper ONNX] Too few phoneme IDs, returning silence');
+      return { samples: new Int16Array(16000), sampleRate: 16000 };
+    }
 
     // Create input tensors
     const inputTensor = new ort.Tensor('int64', BigInt64Array.from(phonemeIds.map(id => BigInt(id))), [1, phonemeIds.length]);
@@ -95,13 +115,16 @@ export async function generateAudioONNX(
     const output = await ortSession.run(feeds);
     const audioData = output.output.data as Float32Array;
 
+    if (!audioData || audioData.length === 0) {
+      throw new TTSGenerationError('ONNX model returned empty audio data');
+    }
+
     console.log(`[Piper ONNX] Generated ${audioData.length} audio samples`);
 
     // Convert float32 PCM to int16 PCM with volume boost
-    const volumeBoost = 2.0; // Boost volume by 2x
+    const volumeBoost = 2.0;
     const int16Data = new Int16Array(audioData.length);
     for (let i = 0; i < audioData.length; i++) {
-      // Apply volume boost and clamp to [-1, 1], then convert to int16 range
       const boostedValue = audioData[i] * volumeBoost;
       const clampedValue = Math.max(-1, Math.min(1, boostedValue));
       int16Data[i] = Math.round(clampedValue * 32767);
@@ -113,7 +136,14 @@ export async function generateAudioONNX(
     };
   } catch (error) {
     console.error('[Piper ONNX] Generation failed:', error);
-    // Return silence on error
+
+    // Re-throw known errors
+    if (error instanceof TTSGenerationError) {
+      throw error;
+    }
+
+    // For unexpected errors, return silence but log the issue
+    console.error('[Piper ONNX] Returning silence due to error');
     return { samples: new Int16Array(16000), sampleRate: 16000 };
   }
 }

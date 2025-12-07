@@ -14,8 +14,15 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
+# Copy files needed for phoneme build first to cache this layer
+COPY tsconfig.json ./
+COPY scripts/build-phonemes.ts ./scripts/
+RUN npm run build:phonemes
+
+# Then copy the rest of the application
 COPY . .
 
-EXPOSE 3000
-CMD ["npm", "run", "dev"]
+EXPOSE 3050
+ENV PORT=3050
+CMD ["npx", "next", "dev", "-p", "3050"]
 

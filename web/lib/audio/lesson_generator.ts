@@ -1,5 +1,5 @@
 import { generateAudio } from './piper';
-import { PCM, concat, silence, crossfade, createWav, getDurationMs, trimSilence } from './dsp';
+import { PCM, concat, silence, createWav, getDurationMs, trimSilence } from './dsp';
 import { toIPA } from '@/lib/utils/phoneme_parser';
 
 interface LessonRequest {
@@ -116,13 +116,6 @@ export async function generateWordAudio(
     console.log(`[Gen] Generating Smooth Blend (Native Piper)...`);
     // Scale 5.0 = ~5x slower with reduced noise params for smoother output
     const smoothBlend = await generateAudio(text, 5.0);
-
-    /* Legacy DSP Blend (Disabled)
-    let smoothBlend = stretchedPhonemes[0];
-    for (let i = 1; i < stretchedPhonemes.length; i++) {
-        smoothBlend = crossfade(smoothBlend, stretchedPhonemes[i], 250); 
-    }
-    */
 
     // 5. Isolated Onset/Rime Clips (using plain text)
     let onsetPCM = null;

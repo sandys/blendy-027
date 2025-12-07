@@ -1,4 +1,13 @@
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
+
+/**
+ * Sanitize text input to prevent any injection issues
+ * Only allows alphanumeric, spaces, and basic punctuation
+ */
+function sanitizeText(text: string): string {
+    // Remove any potentially dangerous characters, keep only safe ones
+    return text.replace(/[^a-zA-Z0-9\s.,!?'-]/g, '').trim();
+}
 
 /**
  * Convert text to phoneme IDs using piper-phonemize
@@ -6,18 +15,24 @@ import { execSync } from 'child_process';
  */
 export function textToPiperPhonemes(text: string): string {
     try {
-        // Use piper_phonemize to get phoneme IDs in espeak format
-        // -l en-us: US English
-        // --espeak: output espeak phoneme notation
-        const result = execSync(`echo "${text}" | piper_phonemize -l en-us --espeak`, {
+        const safeText = sanitizeText(text);
+        if (!safeText) return text;
+
+        // Use spawnSync with array args to prevent command injection
+        const result = spawnSync('piper_phonemize', ['-l', 'en-us', '--espeak'], {
+            input: safeText,
             encoding: 'utf-8',
             timeout: 5000
         });
 
-        return result.trim();
+        if (result.error || result.status !== 0) {
+            console.error(`[Phonemize] piper_phonemize failed:`, result.stderr);
+            return textToEspeakPhonemes(text);
+        }
+
+        return result.stdout.trim();
     } catch (error) {
         console.error(`[Phonemize] piper_phonemize failed for "${text}":`, error);
-        // Fallback to espeak-ng
         return textToEspeakPhonemes(text);
     }
 }
@@ -28,19 +43,23 @@ export function textToPiperPhonemes(text: string): string {
  */
 export function textToEspeakPhonemes(text: string): string {
     try {
-        // Use espeak-ng to get phoneme notation (-x flag)
-        // -v en-us: US English voice
-        // -q: quiet (no audio output)
-        // -x: output phoneme notation
-        const result = execSync(`echo "${text}" | espeak-ng -v en-us -q -x`, {
+        const safeText = sanitizeText(text);
+        if (!safeText) return text;
+
+        // Use spawnSync with array args to prevent command injection
+        const result = spawnSync('espeak-ng', ['-v', 'en-us', '-q', '-x', safeText], {
             encoding: 'utf-8',
             timeout: 5000
         });
 
-        return result.trim();
+        if (result.error || result.status !== 0) {
+            console.error(`[Phonemize] espeak-ng failed:`, result.stderr);
+            return text;
+        }
+
+        return result.stdout.trim();
     } catch (error) {
         console.error(`[Phonemize] Failed to phonemize "${text}":`, error);
-        // Fallback to original text
         return text;
     }
 }
@@ -51,19 +70,23 @@ export function textToEspeakPhonemes(text: string): string {
  */
 export function textToIPA(text: string): string {
     try {
-        // Use espeak-ng to get IPA notation (--ipa=3 flag for Piper compatibility)
-        // -v en-us: US English voice
-        // -q: quiet (no audio output)
-        // --ipa=3: output IPA notation compatible with Piper
-        const result = execSync(`espeak-ng -v en-us --ipa=3 -q "${text}"`, {
+        const safeText = sanitizeText(text);
+        if (!safeText) return text;
+
+        // Use spawnSync with array args to prevent command injection
+        const result = spawnSync('espeak-ng', ['-v', 'en-us', '--ipa=3', '-q', safeText], {
             encoding: 'utf-8',
             timeout: 5000
         });
 
-        return result.trim();
+        if (result.error || result.status !== 0) {
+            console.error(`[Phonemize] espeak-ng IPA failed:`, result.stderr);
+            return text;
+        }
+
+        return result.stdout.trim();
     } catch (error) {
         console.error(`[Phonemize] Failed to get IPA for "${text}":`, error);
-        // Fallback to original text
         return text;
     }
 }

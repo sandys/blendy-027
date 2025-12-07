@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateAudioONNX } from '@/lib/audio/piper_onnx';
-import { createWav, trimSilence } from '@/lib/audio/dsp';
 import { wordToGraphemes, wordToAce } from '@/lib/audio/g2p';
 import { textToIPA } from '@/lib/audio/phonemize';
+import fs from 'fs';
+import path from 'path';
 
 export const dynamic = 'force-dynamic';
+
+// Define a minimal interface for the JSON manifest
+interface PhonemeManifest {
+  phonemes: Record<string, { kind: 'plosive' | 'continuant' | 'vowel' }>;
+}
+
+interface SegmentDataWithKind {
+  grapheme: string;
+  ipa: string;
+  kind: 'plosive' | 'continuant' | 'vowel';
+}
 
 export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
@@ -15,79 +26,55 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        // Break word into graphemes
+        // Load phoneme manifest directly from filesystem
+        const manifestPath = path.join(process.cwd(), 'public', 'audio', 'phonemes.json');
+        const manifestData = fs.readFileSync(manifestPath, 'utf-8');
+        const manifest: PhonemeManifest = JSON.parse(manifestData);
+        
+        console.log('[API/Fingor] Manifest loaded from FS.');
+
         const graphemes = wordToGraphemes(text);
-        console.log(`[Fingor] Word: "${text}" -> Graphemes:`, graphemes);
-
-        // Use espeak-ng --ipa=3 to get IPA phonemes for the full word
         const fullWordIPA = textToIPA(text);
-        console.log(`[Fingor] Full word IPA (--ipa=3): "${fullWordIPA}"`);
-
-        // Get ACE phonemes for each grapheme to know how many phonemes to expect
         const graphemeACE = graphemes.map(g => wordToAce(g));
-        console.log(`[Fingor] Grapheme ACE breakdown:`, graphemeACE);
-
-        // Parse the IPA output from espeak-ng --ipa=3
-        // For "cat" -> "kˈæt" -> "kæt" (remove stress marks)
         const cleanedIPA = fullWordIPA.replace(/[ˈˌ]/g, '');
-
-        // Split into IPA phoneme characters
         const ipaPhonemes = Array.from(cleanedIPA);
-
-        console.log(`[Fingor] Cleaned IPA: "${cleanedIPA}"`);
-        console.log(`[Fingor] Parsed IPA phonemes:`, ipaPhonemes);
-
-        // Generate audio for each grapheme using corresponding espeak phoneme(s)
-        const segments = [];
+        
+        const segments: SegmentDataWithKind[] = [];
         let phonemeIndex = 0;
 
         for (let i = 0; i < graphemes.length; i++) {
             const grapheme = graphemes[i];
             const numPhonemes = graphemeACE[i].length;
-
-            // Extract the IPA phoneme(s) for this grapheme
             const graphemePhonemes = ipaPhonemes.slice(phonemeIndex, phonemeIndex + numPhonemes);
-            const phonemeString = graphemePhonemes.join('');
-
-            console.log(`[Fingor] Grapheme "${grapheme}" (${numPhonemes} ACE phonemes) -> IPA phoneme(s): "${phonemeString}"`);
-
-            // For isolated consonants, add a brief schwa to make them audible
-            let phonemeForAudio = phonemeString;
-            const ipaVowels = ['a', 'e', 'i', 'o', 'u', 'æ', 'ɑ', 'ɔ', 'ə', 'ɛ', 'ɪ', 'ʊ', 'ʌ', 'e‍ɪ', 'o‍ʊ', 'a‍ɪ', 'a‍ʊ', 'ɔ‍ɪ'];
-            const hasVowel = Array.from(phonemeString).some(ch => ipaVowels.includes(ch));
-
-            if (!hasVowel && phonemeString.length > 0) {
-                phonemeForAudio = phonemeString + 'ə';
-                console.log(`[Fingor] Added schwa for consonant: "${phonemeString}" -> "${phonemeForAudio}"`);
-            }
-
-            // For isolated vowels, repeat them to make them longer and more audible
-            // This is especially important for short vowels like ɪ
-            if (hasVowel && phonemeString.length === 1) {
-                phonemeForAudio = phonemeString + phonemeString;
-                console.log(`[Fingor] Doubled vowel for emphasis: "${phonemeString}" -> "${phonemeForAudio}"`);
-            }
-
-            // Generate audio using ONNX Runtime with IPA phonemes
-            // Use slower speed (higher length_scale) for clearer pronunciation
-            const pcm = await generateAudioONNX(phonemeForAudio, 2.0);
-
-            // Trim silence for seamless looping
-            const trimmed = trimSilence(pcm);
-
-            // Convert to WAV and encode as base64
-            const wav = createWav(trimmed);
-            const audio_url = `data:audio/wav;base64,${wav.toString('base64')}`;
-
-            segments.push({
+            let phonemeKey = graphemePhonemes.join('');
+            
+            // Normalization for our Synth Inventory
+            if (phonemeKey === 'r') phonemeKey = 'ɹ';
+            if (phonemeKey === 'g') phonemeKey = 'ɡ';
+            if (phonemeKey === 'e') phonemeKey = 'ɛ';
+            if (phonemeKey === 'ɒ') phonemeKey = 'ɔ';
+            
+            const info = manifest.phonemes[phonemeKey];
+            
+            if (!info) {
+              console.warn(`[API/Fingor] Phoneme info not found for: ${phonemeKey}`);
+              segments.push({
                 grapheme,
-                audio_url
-            });
-
+                ipa: phonemeKey,
+                kind: 'vowel' // Default fallback
+              });
+            } else {
+              segments.push({
+                  grapheme,
+                  ipa: phonemeKey,
+                  kind: info.kind
+              });
+            }
+            
             phonemeIndex += numPhonemes;
         }
 
-        console.log(`[Fingor] Generated ${segments.length} segments`);
+        console.log(`[API/Fingor] Sending segments for word "${text}":`, segments);
 
         return NextResponse.json(
             { segments },
@@ -98,7 +85,7 @@ export async function GET(req: NextRequest) {
             }
         );
     } catch (e) {
-        console.error('[Fingor] Audio generation failed', e);
+        console.error('[Fingor] Metadata generation failed', e);
         return NextResponse.json({ error: 'Generation failed' }, { status: 500 });
     }
 }

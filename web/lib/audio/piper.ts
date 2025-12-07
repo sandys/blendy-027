@@ -1,48 +1,44 @@
-import { spawn } from 'child_process';
-import fs from 'fs';
-import { readWav, PCM } from './dsp';
+/**
+ * Piper TTS Audio Generation
+ *
+ * This module provides a unified interface for TTS generation using ONNX Runtime.
+ * The legacy spawn-based implementation has been removed in favor of direct ONNX inference.
+ */
 
-const PIPER_BIN = '/usr/local/bin/piper';
-const MODEL_PATH = '/usr/local/share/piper/en_US-amy-low.onnx';
+import { generateAudioONNX } from './piper_onnx';
+import { textToIPA } from './phonemize';
+import { PCM } from './dsp';
 
+/**
+ * Generate audio from text or IPA phonemes
+ *
+ * @param text - Text to synthesize (can be plain text or [[IPA]] notation)
+ * @param lengthScale - Speed control (1.0 = normal, higher = slower)
+ * @returns PCM audio data
+ */
 export async function generateAudio(text: string, lengthScale: number = 1.0): Promise<PCM> {
-    if (!fs.existsSync(PIPER_BIN)) {
-        console.warn("Piper binary missing, returning 1s silence stub");
+    try {
+        let ipaInput: string;
+
+        // Check if already in IPA notation [[...]]
+        if (text.startsWith('[[') && text.endsWith(']]')) {
+            // Extract IPA from brackets
+            ipaInput = text.slice(2, -2);
+        } else {
+            // Convert plain text to IPA
+            ipaInput = textToIPA(text);
+        }
+
+        console.log(`[Piper] Generating audio for: "${ipaInput}" (scale: ${lengthScale})`);
+
+        const pcm = await generateAudioONNX(ipaInput, lengthScale);
+
+        console.log(`[Piper] Generated ${pcm.samples.length} samples at ${pcm.sampleRate}Hz`);
+
+        return pcm;
+    } catch (error) {
+        console.error('[Piper] Generation failed:', error);
+        // Return 1 second of silence as fallback
         return { samples: new Int16Array(16000), sampleRate: 16000 };
     }
-
-    return new Promise((resolve, reject) => {
-        console.log(`[Piper] Spawning: ${PIPER_BIN} --model ${MODEL_PATH} --length_scale ${lengthScale}`);
-        console.log(`[Piper] Input Text: "${text}"`);
-
-        const piper = spawn(PIPER_BIN, [
-            '--model', MODEL_PATH,
-            '--output-file', '-',
-            '--length-scale', lengthScale.toString(),
-            '--noise-scale', '0.333',  // Lower noise = more stable/smoother (default 0.667)
-            '--noise-w-scale', '0.333'       // Lower noise_w = less variation (default 0.8)
-        ]);
-
-        const chunks: Buffer[] = [];
-        
-        piper.stdout.on('data', c => chunks.push(c));
-        piper.stderr.on('data', (d) => console.log(`[Piper STDERR] ${d}`));
-
-        piper.stdin.write(text);
-        piper.stdin.end();
-
-        piper.on('close', code => {
-            console.log(`[Piper] Exited with code ${code}`);
-            if (code !== 0) return reject(new Error(`Piper failed with code ${code}`));
-            try {
-                const wavBuffer = Buffer.concat(chunks);
-                console.log(`[Piper] Generated ${wavBuffer.length} bytes`);
-                const pcm = readWav(wavBuffer);
-                resolve(pcm);
-            } catch (e) {
-                console.error("[Piper] WAV parsing error", e);
-                reject(e);
-            }
-        });
-    });
 }

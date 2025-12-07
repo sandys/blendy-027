@@ -3,10 +3,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { SAMPLE_LESSONS } from '@/lib/data/curriculum';
+import { synth, PhonemeInfo } from '@/lib/audio/PhonemeSynth';
 
-interface AudioSegment {
+interface SegmentData {
   grapheme: string;
-  audio_url: string;
+  ipa: string;
+  kind: PhonemeInfo['kind'];
 }
 
 export default function FingorGame() {
@@ -20,66 +22,127 @@ export default function FingorGame() {
   const exerciseData = exercise?.data as any;
   const word = exerciseData?.word || 'mat';
 
-  const [segments, setSegments] = useState<AudioSegment[]>([]);
+  const [segments, setSegments] = useState<SegmentData[]>([]);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [highlightedIndices, setHighlightedIndices] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [started, setStarted] = useState(false);
-  const [audioReady, setAudioReady] = useState(false);
-  const audioRefs = useRef<HTMLAudioElement[]>([]);
+  const [synthReady, setSynthReady] = useState(false);
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
+  const currentSoundRef = useRef<{ stop: () => void } | null>(null);
+  const connectedSoundRef = useRef<{ stop: () => void } | null>(null); // For connected phonation
 
-  // Fetch audio segments when word changes
+  // Initialize Synth & Fetch Metadata
   useEffect(() => {
-    async function loadAudio() {
+    async function init() {
       setIsLoading(true);
-      setAudioReady(false);
-      setStarted(false); // Reset started state for new exercise
+      setSynthReady(false);
+      setStarted(false);
+
       try {
-        const res = await fetch(`/api/audio/fingor?text=${word}`);
+        await synth.load();
+        setSynthReady(true);
+
+        // Add timestamp to prevent caching
+        const res = await fetch(`/api/audio/fingor?text=${word}&t=${Date.now()}`);
         const data = await res.json();
         setSegments(data.segments);
-
-        // Preload audio elements and wait for them to be ready
-        const audioPromises = data.segments.map((seg: AudioSegment) => {
-          return new Promise<HTMLAudioElement>((resolve) => {
-            const audio = new Audio(seg.audio_url);
-            audio.loop = true;
-            audio.preload = 'auto';
-            audio.addEventListener('canplaythrough', () => resolve(audio), { once: true });
-            audio.load();
-          });
-        });
-
-        audioRefs.current = await Promise.all(audioPromises);
-        setAudioReady(true);
       } catch (err) {
-        console.error('Failed to load audio:', err);
+        console.error('Failed to init game:', err);
       } finally {
         setIsLoading(false);
       }
     }
-    loadAudio();
+    init();
   }, [word]);
 
-  // Play audio for active segment
+  // Handle Audio Playback and Connected Phonation
   useEffect(() => {
-    audioRefs.current.forEach((audio, idx) => {
-      if (idx === activeIndex) {
-        audio.currentTime = 0;
-        audio.play().catch(e => console.warn('Audio play failed:', e));
-      } else {
-        audio.pause();
-        audio.currentTime = 0;
+    // Stop any previously playing sounds before starting new ones
+    const stopCurrentSounds = () => {
+      if (currentSoundRef.current) {
+        currentSoundRef.current.stop();
+        currentSoundRef.current = null;
       }
-    });
-  }, [activeIndex]);
+      if (connectedSoundRef.current) {
+        connectedSoundRef.current.stop();
+        connectedSoundRef.current = null;
+      }
+    };
+
+    stopCurrentSounds();
+
+    if (activeIndex !== null && segments[activeIndex]) {
+      const currentSegment = segments[activeIndex];
+      const nextSegment = segments[activeIndex + 1];
+
+      console.log(`[FingorGame] Interaction Active: Index ${activeIndex} -> ${currentSegment.grapheme} /${currentSegment.ipa}/ (${currentSegment.kind})`);
+
+      // Connected Phonation Logic
+      if (currentSegment.kind === 'plosive' && 
+          nextSegment && 
+          (nextSegment.kind === 'vowel' || nextSegment.kind === 'continuant')) {
+        
+        // Highlight both segments
+        setHighlightedIndices([activeIndex, activeIndex + 1]);
+
+        const context = synth.getContext();
+        if (context) {
+          const now = context.currentTime;
+          const ASSET_SAMPLE_RATE = 16000;
+          const plosiveInfo = synth.getPhonemeInfo(currentSegment.ipa);
+          const plosiveDuration = plosiveInfo ? (plosiveInfo.length / ASSET_SAMPLE_RATE) : 0.18;
+
+          // Start the next sound slightly before the plosive ends for natural coarticulation
+          // Use 10ms overlap to blend the burst into the continuant
+          const nextSoundStartTime = now + plosiveDuration - 0.01;
+
+          // Play the plosive as a one-shot starting NOW
+          currentSoundRef.current = synth.play(currentSegment.ipa, 0, now);
+
+          // Play next continuously, starting near the end of the plosive
+          connectedSoundRef.current = synth.play(nextSegment.ipa, 5000, nextSoundStartTime);
+        }
+
+      } else {
+        // Normal playback
+        setHighlightedIndices([activeIndex]); 
+
+        if (currentSegment.kind === 'plosive') {
+          currentSoundRef.current = synth.play(currentSegment.ipa, 0);
+        } else {
+          currentSoundRef.current = synth.play(currentSegment.ipa, 5000); 
+        }
+      }
+    } else {
+      setHighlightedIndices([]);
+    }
+
+    return () => {
+      // Cleanup on unmount or activeIndex change
+      if (currentSoundRef.current) {
+        currentSoundRef.current.stop();
+        currentSoundRef.current = null;
+      }
+      if (connectedSoundRef.current) {
+        connectedSoundRef.current.stop();
+        connectedSoundRef.current = null;
+      }
+    };
+  }, [activeIndex, segments]);
 
   // Handle pointer events
   const handlePointerDown = (index: number) => {
     if (!started) return;
     isDraggingRef.current = true;
-    setActiveIndex(index); // Set active immediately on pointer down
+    setActiveIndex(index);
+    
+    const ctx = synth.getContext();
+    if (ctx && ctx.state === 'suspended') {
+        ctx.resume();
+    }
   };
 
   const handlePointerUp = () => {
@@ -94,7 +157,7 @@ export default function FingorGame() {
     const element = document.elementFromPoint(point.x, point.y);
 
     if (element && element.hasAttribute('data-segment-index')) {
-      const index = parseInt(element.getAttribute('data-segment-index')!);
+      const index = parseInt(element.getAttribute('data-segment-index')!);;
       if (index !== activeIndex) {
         setActiveIndex(index);
       }
@@ -107,30 +170,35 @@ export default function FingorGame() {
     }
   };
 
+  const handleStart = async () => {
+      const ctx = synth.getContext();
+      if (ctx && ctx.state === 'suspended') {
+          await ctx.resume();
+      }
+      setStarted(true);
+  };
+
   const handleNext = () => {
     const nextExerciseIndex = exerciseIndex + 1;
     if (lesson && nextExerciseIndex < lesson.exercises.length) {
-      // Navigate to next exercise
       router.push(`/games/fingor?lesson=${lessonNumber}&exercise=${nextExerciseIndex}`);
     } else {
-      // Go back to lesson selection or previous page
       router.back();
     }
   };
 
-  // Pre-start State (Tap to Start modal)
   if (!started) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-blue-50 to-blue-100">
         <div
           className="absolute inset-0 bg-black/40 flex items-center justify-center z-50 cursor-pointer backdrop-blur-sm"
-          onClick={() => audioReady && setStarted(true)}
+          onClick={() => synthReady && handleStart()}
         >
           <div className="bg-white px-12 py-8 rounded-3xl shadow-2xl flex flex-col items-center animate-pulse transition-transform hover:scale-105">
-            {!audioReady ? (
+            {!synthReady ? (
               <>
                 <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <div className="text-2xl font-bold text-gray-800">Loading Audio...</div>
+                <div className="text-2xl font-bold text-gray-800">Loading Assets...</div>
               </>
             ) : (
               <>
@@ -168,7 +236,7 @@ export default function FingorGame() {
       {/* Elkonin Boxes */}
       <div className="flex gap-4 mb-12">
         {segments.map((segment, index) => {
-          const isActive = index === activeIndex;
+          const isActive = highlightedIndices.includes(index);
           return (
             <div
               key={index}

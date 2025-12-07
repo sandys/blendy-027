@@ -21,26 +21,28 @@ export default function Providers({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
         return createSyncStoragePersister({
             storage: window.localStorage,
-            key: 'REACT_QUERY_CACHE_V4',
+            key: 'REACT_QUERY_CACHE_V5',
         });
     }
     return undefined;
   });
 
+  const queryProvider = persister ? (
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{ persister, buster: 'v4' }}
+    >
+      {children}
+    </PersistQueryClientProvider>
+  ) : (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  );
+
   return (
     <StoreProvider>
-      {persister ? (
-        <PersistQueryClientProvider
-          client={queryClient}
-          persistOptions={{ persister, buster: 'v3' }}
-        >
-          {children}
-        </PersistQueryClientProvider>
-      ) : (
-        <QueryClientProvider client={queryClient}>
-          {children}
-        </QueryClientProvider>
-      )}
+      {queryProvider}
     </StoreProvider>
   );
 }
